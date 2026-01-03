@@ -141,3 +141,33 @@ def main():  # pragma: no cover
 
 if __name__ == "__main__":  # pragma: no cover
     main()
+
+@app.command()
+def install_hooks(
+    package_path: Path = typer.Argument(".", help="Path to the package directory"),
+):
+    """Install sage-pypi-publisher git hooks (pre-push) into your repository."""
+    from pypi_publisher.hooks import install_git_hooks
+    
+    console.print("[bold]Installing git hooks...[/bold]")
+    success = install_git_hooks(package_path)
+    
+    if success:
+        console.print("\n[green]✓ Ready to use![/green]")
+        console.print("\n[bold]Next time you push:[/bold]")
+        console.print("  1. Update version in pyproject.toml")
+        console.print("  2. git commit -m 'chore: bump version'")
+        console.print("  3. git push")
+        console.print("  4. Hook will detect version change and offer to upload to PyPI!")
+        console.print("\n[dim]Or choose [u]pdate interactively if you forget to bump version[/dim]")
+
+
+@app.command()
+def uninstall_hooks(
+    package_path: Path = typer.Argument(".", help="Path to the package directory"),
+):
+    """Uninstall sage-pypi-publisher git hooks."""
+    from pypi_publisher.hooks import uninstall_git_hooks
+    
+    console.print("[bold]Uninstalling git hooks...[/bold]")
+    uninstall_git_hooks(package_path)
