@@ -52,6 +52,11 @@ class BytecodeCompiler:
 
         self.compiled_path = self.temp_dir / self.package_path.name
         console.print(f"📁 复制项目结构到: {self.compiled_path}")
+        
+        # Remove existing compiled path if it exists (from previous builds)
+        if self.compiled_path.exists():
+            console.print(f"  🧹 清理已存在的目录: {self.compiled_path}")
+            shutil.rmtree(self.compiled_path)
         shutil.copytree(self.package_path, self.compiled_path, symlinks=True)
 
         self._compile_python_files()
