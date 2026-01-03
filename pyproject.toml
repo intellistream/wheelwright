@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sage-pypi-publisher"
-version = "0.1"
+version = "0.1.4"
 description = "Python bytecode compiler and PyPI publishing toolkit for monorepos"
 readme = "README.md"
 license = "MIT"
