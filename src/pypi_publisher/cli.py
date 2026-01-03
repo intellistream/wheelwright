@@ -8,6 +8,7 @@ import typer
 from rich.console import Console
 
 from pypi_publisher.compiler import BytecodeCompiler
+from pypi_publisher.manylinux_builder import ManylinuxBuilder
 from pypi_publisher._version import __version__
 
 console = Console()
@@ -38,7 +39,48 @@ def build(
     compiled = compiler.compile_package(output_dir)
     wheel_path = compiler.build_wheel(compiled)
     console.print(f"[bold green]✓ 构建成功: {wheel_path}[/bold green]")
+    
     if upload:
+        compiler.upload_wheel(wheel_path, repository=repository, dry_run=dry_run)
+
+
+@app.command("build-manylinux")
+def build_manylinux(
+    package_path: Path = typer.Argument(..., help="Path to the package directory"),
+    output_dir: Optional[Path] = typer.Option(None, "--output", "-o", help="Output directory (default: ./wheelhouse)"),
+    platform_tag: str = typer.Option("manylinux_2_34_x86_64", "--platform", "-p", help="Manylinux platform tag"),
+    upload: bool = typer.Option(False, "--upload", "-u", help="Upload after build"),
+    repository: str = typer.Option("pypi", "--repository", "-r", help="pypi or testpypi"),
+    dry_run: bool = typer.Option(True, "--dry-run/--no-dry-run", help="Skip actual upload when true"),
+):
+    """
+    Build manylinux wheel for C/C++ extension packages.
+    
+    This is useful for packages with C/C++ extensions that have external
+    dependencies (like MKL, FAISS, CUDA) which can't be bundled by auditwheel.
+    The wheel will be built with the specified manylinux platform tag.
+    
+    Examples:
+        # Build a manylinux wheel
+        sage-pypi-publisher build-manylinux .
+        
+        # Build and upload (real upload)
+        sage-pypi-publisher build-manylinux . --upload --no-dry-run
+        
+        # Use a specific platform tag
+        sage-pypi-publisher build-manylinux . --platform manylinux_2_28_x86_64
+    """
+    builder = ManylinuxBuilder(package_path)
+    wheel_path = builder.build_manylinux_wheel(
+        output_dir=output_dir,
+        platform_tag=platform_tag,
+    )
+    
+    console.print(f"[bold green]✓ Manylinux wheel created: {wheel_path.name}[/bold green]")
+    
+    if upload:
+        from pypi_publisher.compiler import BytecodeCompiler
+        compiler = BytecodeCompiler(package_path)
         compiler.upload_wheel(wheel_path, repository=repository, dry_run=dry_run)
 
 
