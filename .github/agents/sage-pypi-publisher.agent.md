@@ -11,7 +11,10 @@ This specialized agent assists with development and maintenance of the `sage-pyp
 
 - **Bytecode Compilation**: Converting Python packages to `.pyc` format while preserving critical files
 - **Wheel Building**: Creating distributable wheel packages from compiled code
+- **Manylinux Wheels**: Building manylinux-compatible wheels for C/C++ extensions
 - **PyPI Publishing**: Uploading packages to PyPI/TestPyPI with safety features
+- **Package Detection**: Auto-detecting Python packages in monorepo structures
+- **Build Hooks**: Custom pre-build and post-build hooks for advanced workflows
 - **CLI Development**: Typer-based command-line interface enhancements
 - **Rich Console**: Implementing beautiful, Chinese-friendly terminal output
 
@@ -19,7 +22,10 @@ This specialized agent assists with development and maintenance of the `sage-pyp
 
 **Use this agent when:**
 - Developing new compilation features or build logic
+- Working with manylinux wheel building for C/C++ extensions
+- Implementing package detection in monorepo structures
 - Adding/modifying CLI commands with Typer
+- Creating or updating build hooks (pre/post-build)
 - Implementing error handling with custom exceptions
 - Working with `pyproject.toml` manipulation logic
 - Debugging wheel build or upload issues
@@ -40,6 +46,9 @@ This specialized agent assists with development and maintenance of the `sage-pyp
 - "Fix the compilation logic to skip setup.py files"
 - "Add progress bar for file compilation using Rich"
 - "Implement dry-run mode for wheel verification"
+- "Build manylinux wheels for packages with C extensions"
+- "Add hook support for custom build steps"
+- "Detect all Python packages in src/ directory"
 - "Add type hints to the upload_wheel method"
 - "Write tests for the BytecodeCompiler class"
 - "Update error messages to use Chinese with emoji"
@@ -138,6 +147,9 @@ This agent understands:
 - **setuptools** and `pyproject.toml` standards (PEP 517/518/621)
 - **twine** upload API and PyPI/TestPyPI repositories
 - **py_compile** and bytecode compilation internals
+- **manylinux** platform tags and wheel compatibility
+- **subprocess** for build tools and external commands
+- **Build hooks** and custom build workflows
 - **pytest** fixtures, mocks, and parametrize decorators
 - **ruff** and **mypy** configuration and error messages
 
