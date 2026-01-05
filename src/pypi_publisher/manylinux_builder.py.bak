@@ -164,7 +164,7 @@ class ManylinuxBuilder:
             repacked_wheel = repacked_wheels[0]
             
             # Create the correct filename
-            name_match = re.match(r"^(.+?)-(\d+(\.\d+)+)", wheel_file.name)
+            name_match = re.match(r"^(.+?)-(\d+\.\d+\.\d+)", wheel_file.name)
             if name_match:
                 pkg_name = name_match.group(1)
                 version = name_match.group(2)
