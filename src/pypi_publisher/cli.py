@@ -17,6 +17,16 @@ try:
 except ImportError:
     import tomli as tomllib  # type: ignore
 
+# Known SAGE packages to always include in version checks
+KNOWN_SAGE_PACKAGES = [
+    "isage-pypi-publisher", "isage-kernel", "isage-middleware", "isage-neuromem", 
+    "isage", "isage-llm-gateway", "isage-libs", "isage-llm-core", "isage-common", 
+    "isage-data", "isage-vdb", "isage-tsdb", "isage-refiner", "isage-flow", 
+    "isage-benchmark", "sage-github-manager", "isage-edge", "isage-tools", 
+    "isage-studio", "isage-apps", "isage-cli", "isage-platform", "intellistream", 
+    "pysame"
+]
+
 console = Console()
 app = typer.Typer(name="sage-pypi-publisher", add_completion=False, no_args_is_help=True)
 
@@ -133,11 +143,18 @@ def upload(
     compiler.upload_wheel(wheel_path, repository=repository, dry_run=dry_run)
 
 
-@app.callback()
-def version_callback(version: bool = typer.Option(False, "--version", callback=None, is_eager=True, help="Show version and exit")):
-    if version:
+def print_version(value: bool):
+    if value:
         console.print(f"sage-pypi-publisher {__version__}")
-        raise typer.Exit(0)
+        raise typer.Exit()
+
+@app.callback()
+def main_callback(
+    version: Optional[bool] = typer.Option(
+        None, "--version", callback=print_version, is_eager=True, help="Show version and exit"
+    )
+):
+    pass
 
 
 
@@ -173,12 +190,9 @@ def uninstall_hooks(
     uninstall_git_hooks(package_path)
 
 
-def find_monorepo_packages(root: Path) -> list[str]:
-    """Find all packages in the monorepo by looking for pyproject.toml files."""
-    packages = []
-    # Use glob to find pyproject.toml files
-    # Exclude common ignore dirs manually for speed if needed, but rglob is okay for reasonable size
-    # We'll skip directories starting with . or _ or build/dist/venv
+def find_monorepo_packages(root: Path) -> dict[str, str]:
+    """Find all packages and their local versions in the monorepo by scanning pyproject.toml files."""
+    packages = {}
     
     console.print(f"[dim]Scanning {root} for python packages...[/dim]")
     
@@ -190,91 +204,131 @@ def find_monorepo_packages(root: Path) -> list[str]:
         try:
             with open(path, "rb") as f:
                 data = tomllib.load(f)
-            name = data.get("project", {}).get("name")
+            project = data.get("project", {})
+            name = project.get("name")
+            version = project.get("version", "0.0.0")
             if name:
-                packages.append(name)
+                packages[name] = version
         except Exception:
             continue
             
-    return sorted(list(set(packages)))
+    return packages
 
 
 @app.command()
-def update_readme_versions(
-    packages: Optional[list[str]] = typer.Argument(None, help="List of packages to track. If not provided, reads from pyproject.toml [tool.sage-pypi-publisher] or scans directory."),
-    readme_path: Path = typer.Option("README.md", "--readme", "-r", help="Path to README.md"),
+def list_versions(
+    packages: Optional[list[str]] = typer.Argument(None, help="List of packages to check. If not provided, scans directory and uses known SAGE packages."),
     auto_discover: bool = typer.Option(True, help="Auto discover packages in current directory if config is missing"),
+    show_all: bool = typer.Option(False, "--show-all", "-a", help="Show all known packages even if not found locally"),
 ):
-    """Update README.md with latest versions from PyPI for given packages."""
+    """
+    List local packages and compare with PyPI versions.
     
-    if not packages:
-        # 1. Try to read from pyproject.toml config
-        try:
-            if Path("pyproject.toml").exists():
-                with open("pyproject.toml", "rb") as f:
-                    data = tomllib.load(f)
-                packages = data.get("tool", {}).get("sage-pypi-publisher", {}).get("tracked-packages", [])
-        except Exception as e:
-            console.print(f"[yellow]Could not read config from pyproject.toml: {e}[/yellow]")
+    Scans the current directory (recursively) for `pyproject.toml` files,
+    finds the package name and local version, checks PyPI, and displays a comparison table.
     
-    if not packages and auto_discover:
-        # 2. Auto-discover from monorepo
-        console.print("[yellow]No packages configured. Scanning for packages in current directory...[/yellow]")
-        packages = find_monorepo_packages(Path("."))
-        if packages:
-            console.print(f"[green]Discovered packages: {', '.join(packages)}[/green]")
+    Includes known SAGE ecosystem packages by default.
+    """
+    from rich.table import Table
+    from packaging.version import parse as parse_version
+
+    local_packages = {}
+    target_packages = set()
     
-    if not packages:
-        console.print("[red]No packages specified, configured, or found in directory.[/red]")
-        console.print("Please provide package names, configure [tool.sage-pypi-publisher] tracked-packages, or run in a monorepo root.")
+    # 1. Determine local packages (always scan to get versions if available)
+    if auto_discover:
+        local_packages = find_monorepo_packages(Path("."))
+    
+    # 2. Determine target list of packages to display
+    if packages:
+        # User specified packages explicitly
+        target_packages = set(packages)
+    else:
+        # Default: Local packages + Known SAGE packages
+        target_packages = set(local_packages.keys()) | set(KNOWN_SAGE_PACKAGES)
+
+    if not target_packages:
+        console.print("[red]No packages found or specified.[/red]")
         raise typer.Exit(code=1)
 
-    if not readme_path.exists():
-        console.print(f"[red]README file not found: {readme_path}[/red]")
-        raise typer.Exit(code=1)
-        
-    content = readme_path.read_text(encoding="utf-8")
+    table = Table(title="📦 Package Version Status")
+    table.add_column("Package", style="cyan", no_wrap=True)
+    table.add_column("Local Version", style="magenta")
+    table.add_column("PyPI Version", style="green")
+    table.add_column("Status", style="bold")
     
-    start_marker = "<!-- START_VERSION_TABLE -->"
-    end_marker = "<!-- END_VERSION_TABLE -->"
-    
-    if start_marker not in content or end_marker not in content:
-        console.print(f"[yellow]Markers not found in {readme_path}. Appending new table...[/yellow]")
-        # Append to end if not found
-        content += f"\n\n## Component Versions\n\n{start_marker}\n{end_marker}\n"
-    
-    # Fetch versions
-    rows = []
-    for pkg in packages:
-        try:
-            resp = requests.get(f"https://pypi.org/pypi/{pkg}/json", timeout=10)
-            if resp.status_code == 200:
-                data = resp.json()
-                version = data["info"]["version"]
-                rows.append(f"| [{pkg}](https://pypi.org/project/{pkg}/) | [![PyPI](https://img.shields.io/pypi/v/{pkg})](https://pypi.org/project/{pkg}/) | `{version}` |")
-                console.print(f"[green]✓ Found {pkg}: {version}[/green]")
-            else:
-                rows.append(f"| {pkg} | Not Found | - |")
-                console.print(f"[red]✗ {pkg}: Not found on PyPI[/red]")
-        except Exception as e:
-            rows.append(f"| {pkg} | Error | - |")
-            console.print(f"[red]Error fetching {pkg}: {e}[/red]")
+    with console.status("[bold green]Fetching PyPI info..."):
+        for pkg_name in sorted(target_packages):
+            local_ver = local_packages.get(pkg_name)
             
-    header = "| Component | Status | Latest Version |\n|-----------|--------|----------------|\n"
-    table_content = header + "\n".join(rows) + "\n"
+            # If not local and not showing all (implied by default behavior logic check)
+            # Actually, user requested "put our projects in", so we probably want to show them all.
+            # But let's differentiate visually.
+            
+            pypi_ver = _fetch_pypi_version(pkg_name)
+            
+            if not local_ver and not pypi_ver:
+                # Neither local nor remote - skip if it came from the known list?
+                # No, if it's in known list but not on pypi, maybe we should show "Not in PyPI"
+                # But to avoid clutter, maybe we hide it if user didn't ask for it explicitly?
+                # User asked to "put projects in", so let's show them.
+                pass
+
+            status = ""
+            status_style = ""
+            
+            display_local = local_ver if local_ver else "[dim]Not Local[/dim]"
+            
+            if not pypi_ver:
+                pypi_ver = "[dim]Not Found[/dim]"
+                status = "Unpublished"
+                status_style = "dim"
+                if local_ver:
+                    status = "New Package"
+                    status_style = "blue"
+            else:
+                if local_ver:
+                    try:
+                        v_local = parse_version(local_ver)
+                        v_pypi = parse_version(pypi_ver)
+                        
+                        if v_local > v_pypi:
+                            status = "🚀 Ready to Publish"
+                            status_style = "green"
+                        elif v_local < v_pypi:
+                            status = "⚠️ Local behind PyPI"
+                            status_style = "yellow"
+                        else:
+                            status = "✓ Up to date"
+                            status_style = "dim"
+                            
+                    except Exception:
+                        status = "Unknown"
+                else:
+                    status = "Remote Only"
+                    status_style = "cyan"
+            
+            table.add_row(
+                pkg_name, 
+                display_local, 
+                pypi_ver, 
+                f"[{status_style}]{status}[/{status_style}]"
+            )
     
-    # Replace content between markers
-    import re
-    pattern = f"{re.escape(start_marker)}.*?{re.escape(end_marker)}"
-    replacement = f"{start_marker}\n{table_content}{end_marker}"
-    
-    new_content = re.sub(pattern, replacement, content, flags=re.DOTALL)
-    
-    if new_content != content:
-        readme_path.write_text(new_content, encoding="utf-8")
-        console.print(f"[bold green]Updated {readme_path} successfully![/bold green]")
-    else:
-        console.print("[yellow]No changes needed.[/yellow]")
+    console.print(table)
+
+
+def _fetch_pypi_version(package_name: str) -> Optional[str]:
+    """Fetch latest version from PyPI JSON API."""
+    try:
+        resp = requests.get(f"https://pypi.org/pypi/{package_name}/json", timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            return data["info"]["version"]
+    except Exception:
+        pass
+    return None
+
 
 
 def main():  # pragma: no cover
