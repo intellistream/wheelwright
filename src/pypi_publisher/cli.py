@@ -11,6 +11,11 @@ from pypi_publisher.compiler import BytecodeCompiler
 from pypi_publisher.manylinux_builder import ManylinuxBuilder
 from pypi_publisher.detector import detect_build_system
 from pypi_publisher._version import __version__
+import requests
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib  # type: ignore
 
 console = Console()
 app = typer.Typer(name="sage-pypi-publisher", add_completion=False, no_args_is_help=True)
@@ -135,12 +140,7 @@ def version_callback(version: bool = typer.Option(False, "--version", callback=N
         raise typer.Exit(0)
 
 
-def main():  # pragma: no cover
-    app()
 
-
-if __name__ == "__main__":  # pragma: no cover
-    main()
 
 @app.command()
 def install_hooks(
@@ -171,3 +171,117 @@ def uninstall_hooks(
     
     console.print("[bold]Uninstalling git hooks...[/bold]")
     uninstall_git_hooks(package_path)
+
+
+def find_monorepo_packages(root: Path) -> list[str]:
+    """Find all packages in the monorepo by looking for pyproject.toml files."""
+    packages = []
+    # Use glob to find pyproject.toml files
+    # Exclude common ignore dirs manually for speed if needed, but rglob is okay for reasonable size
+    # We'll skip directories starting with . or _ or build/dist/venv
+    
+    console.print(f"[dim]Scanning {root} for python packages...[/dim]")
+    
+    for path in root.rglob("pyproject.toml"):
+        # Skip if in hidden dir or build dir
+        if any(part.startswith(('.', '_')) or part in ('build', 'dist', 'venv', 'env', 'node_modules') for part in path.parts):
+            continue
+            
+        try:
+            with open(path, "rb") as f:
+                data = tomllib.load(f)
+            name = data.get("project", {}).get("name")
+            if name:
+                packages.append(name)
+        except Exception:
+            continue
+            
+    return sorted(list(set(packages)))
+
+
+@app.command()
+def update_readme_versions(
+    packages: Optional[list[str]] = typer.Argument(None, help="List of packages to track. If not provided, reads from pyproject.toml [tool.sage-pypi-publisher] or scans directory."),
+    readme_path: Path = typer.Option("README.md", "--readme", "-r", help="Path to README.md"),
+    auto_discover: bool = typer.Option(True, help="Auto discover packages in current directory if config is missing"),
+):
+    """Update README.md with latest versions from PyPI for given packages."""
+    
+    if not packages:
+        # 1. Try to read from pyproject.toml config
+        try:
+            if Path("pyproject.toml").exists():
+                with open("pyproject.toml", "rb") as f:
+                    data = tomllib.load(f)
+                packages = data.get("tool", {}).get("sage-pypi-publisher", {}).get("tracked-packages", [])
+        except Exception as e:
+            console.print(f"[yellow]Could not read config from pyproject.toml: {e}[/yellow]")
+    
+    if not packages and auto_discover:
+        # 2. Auto-discover from monorepo
+        console.print("[yellow]No packages configured. Scanning for packages in current directory...[/yellow]")
+        packages = find_monorepo_packages(Path("."))
+        if packages:
+            console.print(f"[green]Discovered packages: {', '.join(packages)}[/green]")
+    
+    if not packages:
+        console.print("[red]No packages specified, configured, or found in directory.[/red]")
+        console.print("Please provide package names, configure [tool.sage-pypi-publisher] tracked-packages, or run in a monorepo root.")
+        raise typer.Exit(code=1)
+
+    if not readme_path.exists():
+        console.print(f"[red]README file not found: {readme_path}[/red]")
+        raise typer.Exit(code=1)
+        
+    content = readme_path.read_text(encoding="utf-8")
+    
+    start_marker = "<!-- START_VERSION_TABLE -->"
+    end_marker = "<!-- END_VERSION_TABLE -->"
+    
+    if start_marker not in content or end_marker not in content:
+        console.print(f"[yellow]Markers not found in {readme_path}. Appending new table...[/yellow]")
+        # Append to end if not found
+        content += f"\n\n## Component Versions\n\n{start_marker}\n{end_marker}\n"
+    
+    # Fetch versions
+    rows = []
+    for pkg in packages:
+        try:
+            resp = requests.get(f"https://pypi.org/pypi/{pkg}/json", timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                version = data["info"]["version"]
+                rows.append(f"| [{pkg}](https://pypi.org/project/{pkg}/) | [![PyPI](https://img.shields.io/pypi/v/{pkg})](https://pypi.org/project/{pkg}/) | `{version}` |")
+                console.print(f"[green]✓ Found {pkg}: {version}[/green]")
+            else:
+                rows.append(f"| {pkg} | Not Found | - |")
+                console.print(f"[red]✗ {pkg}: Not found on PyPI[/red]")
+        except Exception as e:
+            rows.append(f"| {pkg} | Error | - |")
+            console.print(f"[red]Error fetching {pkg}: {e}[/red]")
+            
+    header = "| Component | Status | Latest Version |\n|-----------|--------|----------------|\n"
+    table_content = header + "\n".join(rows) + "\n"
+    
+    # Replace content between markers
+    import re
+    pattern = f"{re.escape(start_marker)}.*?{re.escape(end_marker)}"
+    replacement = f"{start_marker}\n{table_content}{end_marker}"
+    
+    new_content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+    
+    if new_content != content:
+        readme_path.write_text(new_content, encoding="utf-8")
+        console.print(f"[bold green]Updated {readme_path} successfully![/bold green]")
+    else:
+        console.print("[yellow]No changes needed.[/yellow]")
+
+
+def main():  # pragma: no cover
+    app()
+
+
+if __name__ == "__main__":  # pragma: no cover
+    main()
+
+

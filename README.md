@@ -44,6 +44,23 @@ wheel = compiler.build_wheel(compiled)
 compiler.upload_wheel(wheel, repository="testpypi", dry_run=True)
 ```
 
+## Git Hooks
+
+sage-pypi-publisher provides intelligent git hooks to simplify version management and PyPI publishing.
+
+### Installation
+
+```bash
+sage-pypi-publisher install-hooks .
+```
+
+### Features
+
+- **Auto-detection**: Detects version changes in `pyproject.toml` on push.
+- **Interactive Update**: Prompts to update version if forgotten.
+- **Auto-Publish**: Builds and uploads to PyPI automatically upon confirmation.
+- **Smart Build**: Detects C/C++ extensions for manylinux wheels.
+
 ## Notes
 - Requires `python -m build` and `twine` available.
 - No backward compatibility with `sage-dev` CLI; PyPI commands have been removed from SAGE.

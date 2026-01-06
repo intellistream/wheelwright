@@ -160,7 +160,17 @@ class BytecodeCompiler:
             for py_file in files_to_compile:
                 try:
                     pyc_file = py_file.with_suffix(".pyc")
-                    py_compile.compile(py_file, pyc_file, doraise=True)
+                    # Calculate clean relative path for co_filename to avoid leaking build paths
+                    # and ensure clean tracebacks on user machines
+                    rel_path = py_file.relative_to(self.compiled_path)
+                    
+                    # If using src-layout, strip the src/ prefix to match installation structure
+                    clean_path = str(rel_path)
+                    parts = rel_path.parts
+                    if parts[0] == "src" and len(parts) > 1:
+                        clean_path = str(Path(*parts[1:]))
+                        
+                    py_compile.compile(str(py_file), str(pyc_file), dfile=clean_path, doraise=True)
                 except Exception as e:  # noqa: BLE001
                     failed_files.append((py_file.relative_to(self.compiled_path), str(e)))
                 progress.update(task, advance=1)
