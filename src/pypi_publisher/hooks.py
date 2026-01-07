@@ -1,7 +1,6 @@
 """Git hooks management for sage-pypi-publisher."""
 from __future__ import annotations
 
-import os
 import stat
 from pathlib import Path
 
@@ -53,11 +52,11 @@ if [ "$VERSION_UPDATED" = true ]; then
     echo -e "  ${RED}[c]${NC} Cancel push"
     echo -n "Your choice [y/n/c]: "
     read -r response </dev/tty
-    
+
     if [[ "$response" =~ ^[Yy]$ ]]; then
         echo -e "${GREEN}🔨 Building package...${NC}"
         rm -rf dist/ wheelhouse/ 2>/dev/null || true
-        
+
         if command -v sage-pypi-publisher &> /dev/null; then
             echo -e "${GREEN}Using sage-pypi-publisher (auto-detects build type)...${NC}"
             if sage-pypi-publisher build . --upload --no-dry-run; then
@@ -96,7 +95,7 @@ else
     echo -e "  ${RED}[n]${NC} Cancel push"
     echo -n "Your choice [u/y/n]: "
     read -r response </dev/tty
-    
+
     if [[ "$response" =~ ^[Uu]$ ]]; then
         echo ""
         echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -107,22 +106,22 @@ else
         echo -e "${GREEN}Enter new version (e.g., 0.1.4, 1.0.0):${NC}"
         echo -n "New version: "
         read -r new_version </dev/tty
-        
+
         if [[ ! "$new_version" =~ ^[0-9]+\\.[0-9]+\\.[0-9]+([a-zA-Z0-9._-]+)?$ ]]; then
             echo -e "${RED}✗ Invalid format. Expected: X.Y.Z${NC}"
             exit 1
         fi
-        
+
         sed -i "s/version = \\"${CURRENT_VERSION}\\"/version = \\"${new_version}\\"/" pyproject.toml
         git add pyproject.toml
         git commit -m "chore: bump version to ${new_version}"
-        
+
         echo ""
         echo -e "${GREEN}✓ ${BLUE}${CURRENT_VERSION}${GREEN} → ${BLUE}${new_version}${NC}"
         echo ""
         echo -e "${BLUE}📦 Build and upload to PyPI? [y/n]:${NC} "
         read -r upload_resp </dev/tty
-        
+
         if [[ "$upload_resp" =~ ^[Yy]$ ]]; then
             rm -rf dist/ wheelhouse/ 2>/dev/null || true
             if command -v sage-pypi-publisher &> /dev/null; then
@@ -195,10 +194,10 @@ echo -e "${GREEN}✓ All checks passed!${NC}"
 def install_git_hooks(package_path: Path | None = None) -> bool:
     """
     Install sage-pypi-publisher git hooks into the current repository.
-    
+
     Args:
         package_path: Path to the package directory. If None, uses current directory.
-        
+
     Returns:
         True if successful, False otherwise
     """
@@ -206,17 +205,17 @@ def install_git_hooks(package_path: Path | None = None) -> bool:
         package_path = Path.cwd()
     else:
         package_path = Path(package_path)
-    
+
     # Find .git directory
     git_dir = package_path / ".git"
     if not git_dir.exists():
         console.print("[red]✗ Not a git repository[/red]")
         console.print("[yellow]Run 'git init' first[/yellow]")
         return False
-    
+
     hooks_dir = git_dir / "hooks"
     hooks_dir.mkdir(exist_ok=True)
-    
+
     # Get package name from pyproject.toml
     pyproject_file = package_path / "pyproject.toml"
     package_name = "your-package"
@@ -228,7 +227,7 @@ def install_git_hooks(package_path: Path | None = None) -> bool:
                 import tomllib as tomli  # type: ignore
             except ImportError:
                 tomli = None
-        
+
         if tomli:
             try:
                 with open(pyproject_file, "rb") as f:
@@ -236,11 +235,11 @@ def install_git_hooks(package_path: Path | None = None) -> bool:
                     package_name = data.get("project", {}).get("name", "your-package")
             except Exception:
                 pass
-    
+
     # Create pre-push hook
     pre_push_hook = hooks_dir / "pre-push"
     hook_content = PRE_PUSH_HOOK_TEMPLATE.replace("{package_name}", package_name)
-    
+
     # Backup existing pre-push hook if it exists
     if pre_push_hook.exists():
         backup_path = hooks_dir / "pre-push.backup"
@@ -248,14 +247,14 @@ def install_git_hooks(package_path: Path | None = None) -> bool:
             console.print(f"[yellow]Backing up existing pre-push hook to {backup_path.name}[/yellow]")
             import shutil
             shutil.copy(pre_push_hook, backup_path)
-    
+
     # Write new pre-push hook
     pre_push_hook.write_text(hook_content, encoding="utf-8")
     pre_push_hook.chmod(pre_push_hook.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
     # Create pre-commit hook
     pre_commit_hook = hooks_dir / "pre-commit"
-    
+
     # Backup existing pre-commit hook if it exists
     if pre_commit_hook.exists():
         backup_path = hooks_dir / "pre-commit.backup"
@@ -263,27 +262,27 @@ def install_git_hooks(package_path: Path | None = None) -> bool:
             console.print(f"[yellow]Backing up existing pre-commit hook to {backup_path.name}[/yellow]")
             import shutil
             shutil.copy(pre_commit_hook, backup_path)
-            
+
     # Write new pre-commit hook
     pre_commit_hook.write_text(PRE_COMMIT_HOOK_TEMPLATE, encoding="utf-8")
     pre_commit_hook.chmod(pre_commit_hook.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-    
+
     console.print("[green]✓ Git hooks installed successfully[/green]")
     console.print(f"[cyan]Location: {hooks_dir}[/cyan]")
     console.print("\n[bold]Hook features:[/bold]")
     console.print("  • Pre-commit: Code quality checks (ruff + mypy)")
     console.print("  • Pre-push: Auto-detects version updates & PyPI upload")
-    
+
     return True
 
 
 def uninstall_git_hooks(package_path: Path | None = None) -> bool:
     """
     Uninstall sage-pypi-publisher git hooks.
-    
+
     Args:
         package_path: Path to the package directory. If None, uses current directory.
-        
+
     Returns:
         True if successful, False otherwise
     """
@@ -291,15 +290,15 @@ def uninstall_git_hooks(package_path: Path | None = None) -> bool:
         package_path = Path.cwd()
     else:
         package_path = Path(package_path)
-    
+
     git_dir = package_path / ".git"
     if not git_dir.exists():
         console.print("[red]✗ Not a git repository[/red]")
         return False
-    
+
     pre_push_hook = git_dir / "hooks" / "pre-push"
     pre_commit_hook = git_dir / "hooks" / "pre-commit"
-    
+
     # Remove pre-push
     if pre_push_hook.exists():
         content = pre_push_hook.read_text(encoding="utf-8")
@@ -313,7 +312,7 @@ def uninstall_git_hooks(package_path: Path | None = None) -> bool:
             else:
                 pre_push_hook.unlink()
                 console.print("[green]✓ Removed pre-push hook[/green]")
-    
+
     # Remove pre-commit
     if pre_commit_hook.exists():
         content = pre_commit_hook.read_text(encoding="utf-8")

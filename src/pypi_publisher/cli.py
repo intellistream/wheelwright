@@ -109,9 +109,29 @@ def build(
         wheel_path = compiler.build_wheel(compiled)
         console.print(f"[bold green]✓ 构建成功: {wheel_path}[/bold green]")
 
+    # Handle upload: auto-upload or prompt user
     if upload:
+        console.print(f"\n🚀 准备上传到 {repository.upper()}...")
         compiler = BytecodeCompiler(package_path, mode=mode)  # type: ignore
         compiler.upload_wheel(wheel_path, repository=repository, dry_run=dry_run)
+    else:
+        # Ask user if they want to upload
+        console.print(f"\n📦 Wheel 文件: [cyan]{wheel_path}[/cyan]")
+        should_upload = typer.confirm(f"是否立即上传到 {repository.upper()}?", default=False)
+
+        if should_upload:
+            # Ask about dry-run mode if not explicitly set
+            if dry_run:
+                real_upload = typer.confirm("⚠️  当前为 dry-run 模式 (不会真正上传)。是否执行真实上传?", default=False)
+                if real_upload:
+                    dry_run = False
+
+            console.print(f"\n🚀 准备上传到 {repository.upper()}...")
+            compiler = BytecodeCompiler(package_path, mode=mode)  # type: ignore
+            compiler.upload_wheel(wheel_path, repository=repository, dry_run=dry_run)
+        else:
+            console.print("\n💡 跳过上传。如需上传，可以运行:")
+            console.print(f"   [cyan]sage-pypi-publisher upload {wheel_path} -r {repository} --no-dry-run[/cyan]")
 
 
 @app.command("build-manylinux")
@@ -148,10 +168,31 @@ def build_manylinux(
 
     console.print(f"[bold green]✓ Manylinux wheel created: {wheel_path.name}[/bold green]")
 
+    # Handle upload: auto-upload or prompt user
     if upload:
+        console.print(f"\n🚀 准备上传到 {repository.upper()}...")
         from pypi_publisher.compiler import BytecodeCompiler
         compiler = BytecodeCompiler(package_path)
         compiler.upload_wheel(wheel_path, repository=repository, dry_run=dry_run)
+    else:
+        # Ask user if they want to upload
+        console.print(f"\n📦 Wheel 文件: [cyan]{wheel_path}[/cyan]")
+        should_upload = typer.confirm(f"是否立即上传到 {repository.upper()}?", default=False)
+
+        if should_upload:
+            # Ask about dry-run mode if not explicitly set
+            if dry_run:
+                real_upload = typer.confirm("⚠️  当前为 dry-run 模式 (不会真正上传)。是否执行真实上传?", default=False)
+                if real_upload:
+                    dry_run = False
+
+            console.print(f"\n🚀 准备上传到 {repository.upper()}...")
+            from pypi_publisher.compiler import BytecodeCompiler
+            compiler = BytecodeCompiler(package_path)
+            compiler.upload_wheel(wheel_path, repository=repository, dry_run=dry_run)
+        else:
+            console.print("\n💡 跳过上传。如需上传，可以运行:")
+            console.print(f"   [cyan]sage-pypi-publisher upload {wheel_path} -r {repository} --no-dry-run[/cyan]")
 
 
 @app.command()
