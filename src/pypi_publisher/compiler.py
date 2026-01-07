@@ -84,8 +84,14 @@ class BytecodeCompiler:
             pyc_files = list(Path(".").rglob("*.pyc"))
             console.print(f"  📊 找到 {len(pyc_files)} 个.pyc文件")
 
-            console.print("  🔨 构建wheel...")
-            result = subprocess.run([sys.executable, "-m", "build", "--wheel"], capture_output=True, text=True)
+            major, minor = sys.version_info.major, sys.version_info.minor
+            python_tag = f"cp{major}{minor}"
+
+            console.print("  🔨 构建wheel (setuptools bdist_wheel)...")
+            console.print(f"  🏷️  使用Python标签: {python_tag}", style="dim")
+
+            build_cmd = [sys.executable, "setup.py", "bdist_wheel", f"--python-tag={python_tag}"]
+            result = subprocess.run(build_cmd, capture_output=True, text=True)
             if result.returncode != 0:
                 error_msg = result.stderr.strip() or "构建失败"
                 raise BuildError(error_msg, package_name=target_path.name)
@@ -233,6 +239,28 @@ class BytecodeCompiler:
             return
 
         content = pyproject_file.read_text(encoding="utf-8")
+        
+        # Set exact Python version constraint for bytecode compatibility
+        major, minor = sys.version_info.major, sys.version_info.minor
+        exact_version = f"=={major}.{minor}.*"
+        
+        requires_python_pattern = r'(requires-python\s*=\s*["\'])([^"\']+)(["\'])'
+        if re.search(requires_python_pattern, content):
+            old_content = content
+            content = re.sub(requires_python_pattern, rf'\1{exact_version}\3', content)
+            if content != old_content:
+                console.print(f"  🐍 设置Python版本约束: {exact_version} (字节码兼容)", style="yellow")
+        else:
+            # Add requires-python to [project] section if missing
+            project_pattern = r'(\[project\][^\[]*?)((?=\[)|$)'
+            match = re.search(project_pattern, content, re.DOTALL)
+            if match:
+                project_section = match.group(1)
+                if 'requires-python' not in project_section:
+                    updated_section = project_section.rstrip() + f'\nrequires-python = "{exact_version}"\n'
+                    content = content.replace(project_section, updated_section)
+                    console.print(f"  🐍 添加Python版本约束: {exact_version} (字节码兼容)", style="yellow")
+        
         uses_scikit_build = "scikit_build_core" in content
         if uses_scikit_build:
             console.print("  🔧 检测到 scikit-build-core，切换到 setuptools", style="yellow")
@@ -348,11 +376,17 @@ setup(
             encoding="utf-8",
         )
 
+        
+
+
+        
+
         if modified or uses_scikit_build:
             pyproject_file.write_text(content, encoding="utf-8")
             console.print("  ✅ 更新pyproject.toml配置", style="green")
         else:
             console.print("  ✓ pyproject.toml配置已满足要求", style="dim")
+
 
     def _verify_wheel_contents(self, wheel_file: Path):
         console.print("  🔍 验证wheel包内容...", style="cyan")
