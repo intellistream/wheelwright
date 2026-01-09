@@ -1,10 +1,12 @@
 """Command line interface for sage-pypi-publisher."""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import requests
 import typer
+from packaging.version import Version
 from rich.console import Console
 
 from pypi_publisher._version import __version__
@@ -72,6 +74,7 @@ def build(
         "-m",
         help="Build mode: 'private'/'bytecode' (compile to .pyc) or 'public'/'source' (keep .py source)",
     ),
+    auto_bump: str | None = typer.Option(None, "--auto-bump", help="Auto bump version: patch/minor/major"),
 ):
     """
     Smart build: auto-detects package type and builds appropriately.
@@ -81,7 +84,12 @@ def build(
 
     Use --force-manylinux or --force-bytecode to override auto-detection.
     Use --mode to choose between private (bytecode) or public (source) builds.
+    Use --auto-bump to automatically increment version (patch/minor/major).
     """
+    # Handle version auto-bump if requested
+    if auto_bump:
+        _bump_version(package_path, auto_bump)
+    
     build_system = detect_build_system(package_path)
 
     if force_manylinux:
@@ -390,6 +398,180 @@ def _fetch_pypi_version(package_name: str) -> str | None:
         pass
     return None
 
+
+def _bump_version(package_path: Path, bump_type: str) -> str:
+    """Bump version in pyproject.toml.
+    
+    Supports 3-part (major.minor.patch) or 4-part (major.minor.micro.patch) version numbers.
+    
+    Args:
+        package_path: Path to package directory containing pyproject.toml
+        bump_type: 'patch', 'minor', or 'major'
+    
+    Returns:
+        New version string
+    """
+    pyproject_path = package_path / "pyproject.toml"
+    if not pyproject_path.exists():
+        console.print(f"[red]❌ pyproject.toml not found in {package_path}[/red]")
+        raise typer.Exit(code=1)
+    
+    # Read current version
+    with open(pyproject_path, "rb") as f:
+        data = tomllib.load(f)
+    
+    current_version_str = data.get("project", {}).get("version", "0.0.0")
+    
+    # Parse version parts manually to support 4-part versions (major.minor.micro.patch)
+    parts = current_version_str.split(".")
+    version_parts = [int(p) for p in parts]
+    
+    # Ensure at least 3 parts
+    while len(version_parts) < 3:
+        version_parts.append(0)
+    
+    # Bump version based on type
+    if bump_type == "patch":
+        # For 4-part versions: increment last part (0.1.8.6 → 0.1.8.7)
+        # For 3-part versions: increment last part (0.1.8 → 0.1.9)
+        if len(version_parts) >= 4:
+            version_parts[-1] += 1
+        elif len(version_parts) == 3:
+            version_parts.append(1)  # Add 4th part
+        else:
+            version_parts[-1] += 1
+    elif bump_type == "minor":
+        # Increment minor, reset micro and patch (0.1.8.6 → 0.1.9.0)
+        version_parts[1] += 1
+        for i in range(2, len(version_parts)):
+            version_parts[i] = 0
+    elif bump_type == "major":
+        # Increment major, reset all others (0.1.8.6 → 1.0.0.0)
+        version_parts[0] += 1
+        for i in range(1, len(version_parts)):
+            version_parts[i] = 0
+    else:
+        console.print(f"[red]❌ Invalid bump type: {bump_type}. Use patch/minor/major[/red]")
+        raise typer.Exit(code=1)
+    
+    new_version_str = ".".join(str(p) for p in version_parts)
+    
+    # Update pyproject.toml
+    with open(pyproject_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    
+    # Replace version using regex (handle both quoted styles)
+    version_pattern = rf'(version\s*=\s*["\'])({re.escape(current_version_str)})(["\'])'
+    new_content = re.sub(version_pattern, rf'\g<1>{new_version_str}\g<3>', content)
+    
+    if new_content == content:
+        console.print(f"[yellow]⚠️  Version pattern not found in pyproject.toml[/yellow]")
+        raise typer.Exit(code=1)
+    
+    with open(pyproject_path, "w", encoding="utf-8") as f:
+        f.write(new_content)
+    
+    console.print(f"[bold green]✓ Version bumped: {current_version_str} → {new_version_str}[/bold green]")
+    return new_version_str
+
+
+@app.command()
+def publish(
+    package_path: Path = typer.Argument(..., help="Path to the package directory"),
+    auto_bump: str | None = typer.Option(None, "--auto-bump", help="Auto bump version: patch/minor/major"),
+    repository: str = typer.Option("pypi", "--repository", "-r", help="pypi or testpypi"),
+    dry_run: bool = typer.Option(True, "--dry-run/--no-dry-run", help="Skip actual upload when true"),
+    mode: str = typer.Option(
+        "private",
+        "--mode",
+        "-m",
+        help="Build mode: 'private'/'bytecode' (compile to .pyc) or 'public'/'source' (keep .py source)",
+    ),
+    force_manylinux: bool = typer.Option(False, "--force-manylinux", help="Force manylinux build"),
+    platform_tag: str = typer.Option("manylinux_2_34_x86_64", "--platform", "-p", help="Manylinux platform tag"),
+):
+    """
+    🚀 One-command publish: bump version → build → upload to PyPI.
+    
+    This command combines version bumping, building, and uploading into a single operation.
+    Perfect for quick releases to PyPI.
+    
+    Examples:
+        # Bump patch version and publish to PyPI (dry-run)
+        sage-pypi-publisher publish . --auto-bump patch
+        
+        # Real publish to PyPI
+        sage-pypi-publisher publish . --auto-bump patch --no-dry-run
+        
+        # Publish to TestPyPI for testing
+        sage-pypi-publisher publish . --auto-bump minor -r testpypi --no-dry-run
+        
+        # Public source release (no bytecode compilation)
+        sage-pypi-publisher publish . --auto-bump patch --mode public --no-dry-run
+    """
+    console.print("[bold cyan]🚀 Starting publish workflow...[/bold cyan]\n")
+    
+    # Step 1: Bump version if requested
+    if auto_bump:
+        console.print(f"[bold]Step 1/3:[/bold] 📝 Bumping version ({auto_bump})...")
+        new_version = _bump_version(package_path, auto_bump)
+    else:
+        console.print("[bold]Step 1/3:[/bold] ⏭️  Skipping version bump (no --auto-bump)...")
+        # Get current version for display
+        pyproject_path = package_path / "pyproject.toml"
+        with open(pyproject_path, "rb") as f:
+            data = tomllib.load(f)
+        new_version = data.get("project", {}).get("version", "unknown")
+    
+    console.print(f"   Version: [cyan]{new_version}[/cyan]\n")
+    
+    # Step 2: Build package
+    console.print("[bold]Step 2/3:[/bold] 🔧 Building package...")
+    build_system = detect_build_system(package_path)
+    
+    if force_manylinux:
+        build_system = "extension"
+    
+    console.print(f"   Build type: [cyan]{build_system}[/cyan]")
+    
+    if build_system == "extension":
+        builder = ManylinuxBuilder(package_path)
+        wheel_path = builder.build_manylinux_wheel(
+            output_dir=None,
+            platform_tag=platform_tag,
+        )
+    else:
+        mode_name = "保密模式 (字节码)" if mode in ("private", "bytecode") else "公开模式 (源码)"
+        console.print(f"   Mode: [cyan]{mode_name}[/cyan]")
+        compiler = BytecodeCompiler(package_path, mode=mode)  # type: ignore
+        compiled = compiler.compile_package(None)
+        wheel_path = compiler.build_wheel(compiled)
+    
+    console.print(f"   [green]✓ Built: {wheel_path.name}[/green]\n")
+    
+    # Step 3: Upload to PyPI
+    console.print(f"[bold]Step 3/3:[/bold] 📤 Uploading to {repository.upper()}...")
+    
+    if dry_run:
+        console.print("   [yellow]⚠️  DRY RUN mode - not actually uploading[/yellow]")
+        console.print(f"   [dim]To really upload, use: --no-dry-run[/dim]\n")
+    
+    compiler = BytecodeCompiler(package_path, mode=mode)  # type: ignore
+    compiler.upload_wheel(wheel_path, repository=repository, dry_run=dry_run)
+    
+    # Summary
+    console.print("\n" + "="*60)
+    if dry_run:
+        console.print("[bold yellow]📋 DRY RUN 完成[/bold yellow]")
+        console.print(f"\n[dim]要真正发布到 {repository.upper()}，请运行:[/dim]")
+        bump_flag = f" --auto-bump {auto_bump}" if auto_bump else ""
+        console.print(f"  [cyan]sage-pypi-publisher publish {package_path}{bump_flag} -r {repository} --no-dry-run[/cyan]")
+    else:
+        console.print("[bold green]🎉 发布成功！[/bold green]")
+        console.print(f"\n📦 Package: [cyan]{wheel_path.name}[/cyan]")
+        console.print(f"🔖 Version: [cyan]{new_version}[/cyan]")
+        console.print(f"🌐 Repository: [cyan]{repository.upper()}[/cyan]")
+    console.print("="*60)
 
 
 def main():  # pragma: no cover
