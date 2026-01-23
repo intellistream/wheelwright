@@ -1,6 +1,6 @@
 ---
-description: 'Python bytecode compiler and PyPI publishing toolkit specialist for monorepo projects'
-tools: ['vscode', 'execute', 'read', 'agent', 'edit', 'search', 'web', 'copilot-container-tools/*', 'todo']
+description: 'Description of the custom chat mode.'
+tools: ['edit', 'runNotebooks', 'search', 'new', 'runCommands', 'runTasks', 'usages', 'vscodeAPI', 'problems', 'changes', 'testFailure', 'openSimpleBrowser', 'fetch', 'githubRepo', 'extensions']
 ---
 
 # SAGE PyPI Publisher Agent

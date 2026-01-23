@@ -3,8 +3,8 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sage-pypi-publisher"
-version = "0.1.5"
+name = "isage-pypi-publisher"
+version = "0.1.8.7"
 description = "Python bytecode compiler and PyPI publishing toolkit for monorepos"
 readme = "README.md"
 license = {text = "MIT"}
@@ -43,7 +43,8 @@ dependencies = [
     "typer>=0.9.0",
     "build>=1.0.0",
     "twine>=4.0.0",
-    "tomli>=2.0.0;python_version<'3.11'",
+    "tomli>=2.0.0",
+    "requests>=2.28.0",
 ]
 
 [project.optional-dependencies]
@@ -75,7 +76,7 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
-ignore = ["E501"]
+ignore = ["E501", "B008"]  # B008: Typer uses function calls in defaults
 
 [tool.mypy]
 python_version = "3.10"
@@ -88,3 +89,4 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+
