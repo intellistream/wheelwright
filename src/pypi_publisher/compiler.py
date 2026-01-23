@@ -124,9 +124,31 @@ class BytecodeCompiler:
             upload_result = subprocess.run(cmd, capture_output=True, text=True)
         except FileNotFoundError as exc:
             raise UploadError("未找到 twine，请先安装 (pip install twine)", repository=repo_name) from exc
-
+        
         if upload_result.returncode == 0:
-            console.print(f"  ✅ 上传到{repo_name}成功", style="green")
+            # 解析输出，区分真正上传和跳过
+            output = upload_result.stdout + upload_result.stderr
+            
+            # 检测是否包含 "Skipping" 或 "File already exists"
+            has_skipped = bool(re.search(r"(Skipping|File already exists|already been uploaded)", output, re.IGNORECASE))
+            # 检测是否有真正的上传
+            has_uploaded = bool(re.search(r"(Uploading|Uploaded)", output, re.IGNORECASE))
+            
+            if has_uploaded and not has_skipped:
+                # 完全新上传
+                console.print(f"  ✅ 已上传新版本到{repo_name}", style="green bold")
+            elif has_skipped and not has_uploaded:
+                # 全部跳过
+                console.print(f"  ℹ️  版本已存在，跳过上传", style="yellow")
+                console.print(f"    提示：无需重新上传，{repo_name}已有此版本", style="dim")
+            elif has_uploaded and has_skipped:
+                # 部分上传，部分跳过
+                console.print(f"  ⚠️  部分文件已上传，部分已存在", style="yellow")
+            else:
+                # 无法判断，使用原来的提示
+                console.print(f"  ✅ 上传到{repo_name}成功", style="green")
+            
+            # 显示 PyPI 链接
             if upload_result.stdout:
                 for line in upload_result.stdout.split("\n"):
                     if "View at:" in line or ("https://" in line and "pypi.org" in line):
@@ -135,8 +157,6 @@ class BytecodeCompiler:
 
         error_msg = upload_result.stderr.strip() if upload_result.stderr else "未知错误"
         raise UploadError(error_msg[:200], repository=repo_name)
-
-    # Helpers
     def _compile_python_files(self):
         assert self.compiled_path
         python_files = list(self.compiled_path.rglob("*.py"))
