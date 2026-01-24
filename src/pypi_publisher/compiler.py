@@ -93,8 +93,8 @@ class BytecodeCompiler:
 
         return self.compiled_path
 
-    def build_wheel(self, compiled_path: Path | None = None) -> Path:
-        """Build wheel from compiled path."""
+    def build_wheel(self, compiled_path: Path | None = None, python_tag: str | None = None) -> Path:
+        """Build wheel from compiled path with optional specific Python tag."""
         target_path = compiled_path or self.compiled_path
         if not target_path:
             raise BuildError("Package not compiled yet. Call compile_package() first.")
@@ -109,10 +109,13 @@ class BytecodeCompiler:
                     console.print(f"  🧹 清理目录: {build_dir}")
 
             pyc_files = list(Path(".").rglob("*.pyc"))
-            console.print(f"  📊 找到 {len(pyc_files)} 个.pyc文件")
+            if pyc_files:
+                console.print(f"  📊 找到 {len(pyc_files)} 个.pyc文件")
 
-            major, minor = sys.version_info.major, sys.version_info.minor
-            python_tag = f"cp{major}{minor}"
+            # Use provided python_tag or auto-detect from current Python
+            if python_tag is None:
+                major, minor = sys.version_info.major, sys.version_info.minor
+                python_tag = f"cp{major}{minor}"
 
             console.print("  🔨 构建wheel (setuptools bdist_wheel)...")
             console.print(f"  🏷️  使用Python标签: {python_tag}", style="dim")
@@ -190,6 +193,81 @@ class BytecodeCompiler:
 
         error_msg = upload_result.stderr.strip() if upload_result.stderr else "未知错误"
         raise UploadError(error_msg[:200], repository=repo_name)
+
+    def build_universal_wheel(self, compiled_path: Path | None = None) -> Path:
+        """Build a universal pure Python wheel (py3-none-any).
+        
+        This is suitable for pure Python packages without C extensions.
+        The wheel will be compatible with all Python 3 versions.
+        """
+        target_path = compiled_path or self.compiled_path
+        if not target_path:
+            raise BuildError("Package not compiled yet. Call compile_package() first.")
+
+        console.print(f"🌍 构建通用wheel包 (py3-none-any): {target_path.name}", style="cyan")
+        original_dir = Path.cwd()
+        os.chdir(target_path)
+        try:
+            for build_dir in ["dist", "build"]:
+                if Path(build_dir).exists():
+                    shutil.rmtree(build_dir)
+                    console.print(f"  🧹 清理目录: {build_dir}")
+
+            console.print("  🔨 构建通用wheel...")
+            build_cmd = [sys.executable, "setup.py", "bdist_wheel", "--universal"]
+            result = subprocess.run(build_cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                error_msg = result.stderr.strip() or "构建失败"
+                raise BuildError(error_msg, package_name=target_path.name)
+
+            dist_files = list(Path("dist").glob("*.whl"))
+            if not dist_files:
+                raise BuildError("构建完成但未找到wheel文件", package_name=target_path.name)
+
+            wheel_file = dist_files[0]
+            console.print(f"    📄 {wheel_file.name} ({wheel_file.stat().st_size/1024:.2f} KB)")
+            console.print("    ✓ 该wheel支持所有Python 3版本", style="green")
+            return wheel_file.resolve()
+        finally:
+            os.chdir(original_dir)
+
+    def build_sdist(self, compiled_path: Path | None = None) -> Path:
+        """Build a source distribution (.tar.gz).
+        
+        Source distributions allow users to install from source and are
+        compatible with any Python version.
+        """
+        target_path = compiled_path or self.compiled_path
+        if not target_path:
+            raise BuildError("Package not compiled yet. Call compile_package() first.")
+
+        console.print(f"📚 构建源码分发包 (sdist): {target_path.name}", style="cyan")
+        original_dir = Path.cwd()
+        os.chdir(target_path)
+        try:
+            for build_dir in ["dist", "build"]:
+                if Path(build_dir).exists():
+                    shutil.rmtree(build_dir)
+                    console.print(f"  🧹 清理目录: {build_dir}")
+
+            console.print("  🔨 构建sdist...")
+            build_cmd = [sys.executable, "setup.py", "sdist"]
+            result = subprocess.run(build_cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                error_msg = result.stderr.strip() or "构建失败"
+                raise BuildError(error_msg, package_name=target_path.name)
+
+            dist_files = list(Path("dist").glob("*.tar.gz"))
+            if not dist_files:
+                raise BuildError("构建完成但未找到sdist文件", package_name=target_path.name)
+
+            sdist_file = dist_files[0]
+            console.print(f"    📄 {sdist_file.name} ({sdist_file.stat().st_size/1024:.2f} KB)")
+            console.print("    ✓ 源码分发包可在所有Python版本上安装", style="green")
+            return sdist_file.resolve()
+        finally:
+            os.chdir(original_dir)
+
     def _compile_python_files(self):
         assert self.compiled_path
         python_files = list(self.compiled_path.rglob("*.py"))
