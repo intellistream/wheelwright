@@ -208,10 +208,13 @@ class BytecodeCompiler:
         original_dir = Path.cwd()
         os.chdir(target_path)
         try:
-            for build_dir in ["dist", "build"]:
-                if Path(build_dir).exists():
-                    shutil.rmtree(build_dir)
-                    console.print(f"  🧹 清理目录: {build_dir}")
+            # Only clean build directory, keep dist for multiple builds
+            if Path("build").exists():
+                shutil.rmtree("build")
+                console.print("  🧹 清理目录: build")
+            
+            # Ensure dist directory exists
+            Path("dist").mkdir(exist_ok=True)
 
             console.print("  🔨 构建通用wheel...")
             build_cmd = [sys.executable, "setup.py", "bdist_wheel", "--universal"]
@@ -245,10 +248,13 @@ class BytecodeCompiler:
         original_dir = Path.cwd()
         os.chdir(target_path)
         try:
-            for build_dir in ["dist", "build"]:
-                if Path(build_dir).exists():
-                    shutil.rmtree(build_dir)
-                    console.print(f"  🧹 清理目录: {build_dir}")
+            # Only clean build directory, keep dist for multiple builds
+            if Path("build").exists():
+                shutil.rmtree("build")
+                console.print("  🧹 清理目录: build")
+            
+            # Ensure dist directory exists
+            Path("dist").mkdir(exist_ok=True)
 
             console.print("  🔨 构建sdist...")
             build_cmd = [sys.executable, "setup.py", "sdist"]
