@@ -159,6 +159,10 @@ def build(
         mode_name = "保密模式 (字节码)" if mode in ("private", "bytecode") else "公开模式 (源码)"
         console.print(f"🔧 Building as pure Python package - {mode_name}...")
         
+        # Initialize compiler
+        compiler = BytecodeCompiler(package_path, mode=mode)  # type: ignore
+        compiled = compiler.compile_package(output_dir)
+        
         # Check if user explicitly wants manual control
         manual_mode = universal or (sdist and not for_pypi)
         
