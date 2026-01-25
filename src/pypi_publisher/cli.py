@@ -75,16 +75,58 @@ def build(
         help="Build mode: 'private'/'bytecode' (compile to .pyc) or 'public'/'source' (keep .py source)",
     ),
     auto_bump: str | None = typer.Option(None, "--auto-bump", help="Auto bump version: patch/minor/major"),
+    for_pypi: bool = typer.Option(
+        True,  # Default to True - smart mode by default!
+        "--for-pypi/--no-for-pypi",
+        help="Smart PyPI mode (default): auto-detect best strategy. Use --no-for-pypi to disable.",
+    ),
+    universal: bool = typer.Option(False, "--universal", help="Force universal wheel (py3-none-any) - overrides smart mode"),
+    sdist: bool = typer.Option(False, "--sdist", help="Also build source distribution (.tar.gz)"),
 ):
     """
     Smart build: auto-detects package type and builds appropriately.
 
-    - C/C++ extension packages → manylinux wheel
-    - Pure Python packages → bytecode compilation (default) or source
-
-    Use --force-manylinux or --force-bytecode to override auto-detection.
-    Use --mode to choose between private (bytecode) or public (source) builds.
-    Use --auto-bump to automatically increment version (patch/minor/major).
+    **🎯 Default Behavior (Smart Mode):**
+    - Automatically enabled! No extra flags needed
+    - Pure Python packages → universal wheel (py3-none-any) + sdist
+    - C/C++ extension packages → current Python wheel + sdist
+    - Perfect for packages declaring Python 3.8+ support
+    
+    **Simplest Usage (Recommended):**
+    ```bash
+    # Just build - smart mode is automatic!
+    sage-pypi-publisher build .
+    
+    # Build and upload to PyPI
+    sage-pypi-publisher build . --upload --no-dry-run
+    
+    # Test on TestPyPI first
+    sage-pypi-publisher build . --upload -r testpypi
+    ```
+    
+    **Why this solves the multi-version problem:**
+    - Universal wheel: One file works on ALL Python 3.x (3.8, 3.9, 3.10, 3.11, 3.12+)
+    - Source dist: Users can compile from source if needed
+    - No need to build separate wheels for each Python version!
+    
+    **Manual Override Options:**
+    - --no-for-pypi: Disable smart mode, build for current Python only
+    - --universal: Force universal wheel (overrides smart detection)
+    - --sdist: Add source distribution (in addition to smart mode)
+    - --force-manylinux: Force manylinux build for C extensions
+    
+    Examples:
+        # Default: Smart mode (automatically chooses best strategy)
+        sage-pypi-publisher build .
+        
+        # Upload to TestPyPI (smart mode still active)
+        sage-pypi-publisher build . --upload -r testpypi
+        
+        # Real PyPI upload
+        sage-pypi-publisher build . --upload --no-dry-run -r pypi
+        
+        # Disable smart mode (old behavior)
+        sage-pypi-publisher build . --no-for-pypi
     """
     # Handle version auto-bump if requested
     if auto_bump:
@@ -97,7 +139,10 @@ def build(
     elif force_bytecode:
         build_system = "pure-python"
 
-    console.print(f"�� Detected build system: [cyan]{build_system}[/cyan]")
+    console.print(f"🔍 Detected build system: [cyan]{build_system}[/cyan]")
+
+    # Track all built artifacts
+    built_artifacts: list[Path] = []
 
     if build_system == "extension":
         # Build manylinux wheel for C/C++ extensions
@@ -107,39 +152,100 @@ def build(
             output_dir=output_dir,
             platform_tag=platform_tag,
         )
+        built_artifacts.append(wheel_path)
         console.print(f"[bold green]✓ 构建成功: {wheel_path.name}[/bold green]")
     else:
         # Build wheel for pure Python (with mode support)
         mode_name = "保密模式 (字节码)" if mode in ("private", "bytecode") else "公开模式 (源码)"
         console.print(f"🔧 Building as pure Python package - {mode_name}...")
+        
+        # Initialize compiler
         compiler = BytecodeCompiler(package_path, mode=mode)  # type: ignore
         compiled = compiler.compile_package(output_dir)
-        wheel_path = compiler.build_wheel(compiled)
-        console.print(f"[bold green]✓ 构建成功: {wheel_path}[/bold green]")
+        
+        # Check if user explicitly wants manual control
+        manual_mode = universal or (sdist and not for_pypi)
+        
+        if for_pypi and not manual_mode:
+            # Smart PyPI mode (DEFAULT): auto-detect best strategy
+            console.print("\n🎯 智能模式（默认）：自动选择最佳发布策略...", style="cyan bold")
+            
+            if build_system == "pure-python" or mode == "public":
+                # Pure Python: universal wheel + sdist
+                console.print("  ✓ 检测到纯Python包")
+                console.print("  📦 策略：通用wheel (py3-none-any) + 源码分发", style="cyan")
+                console.print("  💡 这样所有Python 3.x版本都能安装！\n")
+                
+                wheel_path = compiler.build_universal_wheel(compiled)
+                built_artifacts.append(wheel_path)
+                
+                sdist_path = compiler.build_sdist(compiled)
+                built_artifacts.append(sdist_path)
+            else:
+                # Has extensions: current Python wheel + sdist
+                console.print("  ✓ 检测到C/C++扩展包")
+                console.print("  📦 策略：当前Python版本wheel + 源码分发", style="cyan")
+                console.print("  💡 用户可以从源码编译安装到其他Python版本\n")
+                
+                wheel_path = compiler.build_wheel(compiled)
+                built_artifacts.append(wheel_path)
+                
+                sdist_path = compiler.build_sdist(compiled)
+                built_artifacts.append(sdist_path)
+        elif universal:
+            # Manual: Build universal wheel only
+            console.print("\n🌍 Building universal wheel (py3-none-any)...")
+            wheel_path = compiler.build_universal_wheel(compiled)
+            built_artifacts.append(wheel_path)
+        else:
+            # Standard build for current Python version
+            wheel_path = compiler.build_wheel(compiled)
+            built_artifacts.append(wheel_path)
+            console.print(f"[bold green]✓ 构建成功: {wheel_path}[/bold green]")
+        
+        # Build sdist if requested (and not already built by for_pypi)
+        if sdist and not for_pypi:
+            console.print("\n📚 Building source distribution...")
+            sdist_path = compiler.build_sdist(compiled)
+            built_artifacts.append(sdist_path)
+
+    # Summary of built artifacts
+    if len(built_artifacts) > 1:
+        console.print(f"\n✅ [bold green]Successfully built {len(built_artifacts)} artifacts:[/bold green]")
+        for artifact in built_artifacts:
+            console.print(f"   📦 {artifact.name}")
 
     # Handle upload: auto-upload or prompt user
     if upload:
         console.print(f"\n🚀 准备上传到 {repository.upper()}...")
         compiler = BytecodeCompiler(package_path, mode=mode)  # type: ignore
-        compiler.upload_wheel(wheel_path, repository=repository, dry_run=dry_run)
+        for artifact in built_artifacts:
+            console.print(f"\n  📤 Uploading: {artifact.name}")
+            compiler.upload_wheel(artifact, repository=repository, dry_run=dry_run)
     else:
         # Ask user if they want to upload
-        console.print(f"\n📦 Wheel 文件: [cyan]{wheel_path}[/cyan]")
-        should_upload = typer.confirm(f"是否立即上传到 {repository.upper()}?", default=False)
+        console.print(f"\n📦 Built artifacts:")
+        for artifact in built_artifacts:
+            console.print(f"   • [cyan]{artifact}[/cyan]")
+        
+        if len(built_artifacts) > 0:
+            should_upload = typer.confirm(f"\n是否立即上传到 {repository.upper()}?", default=False)
 
-        if should_upload:
-            # Ask about dry-run mode if not explicitly set
-            if dry_run:
-                real_upload = typer.confirm("⚠️  当前为 dry-run 模式 (不会真正上传)。是否执行真实上传?", default=False)
-                if real_upload:
-                    dry_run = False
+            if should_upload:
+                # Ask about dry-run mode if not explicitly set
+                if dry_run:
+                    real_upload = typer.confirm("⚠️  当前为 dry-run 模式 (不会真正上传)。是否执行真实上传?", default=False)
+                    if real_upload:
+                        dry_run = False
 
-            console.print(f"\n🚀 准备上传到 {repository.upper()}...")
-            compiler = BytecodeCompiler(package_path, mode=mode)  # type: ignore
-            compiler.upload_wheel(wheel_path, repository=repository, dry_run=dry_run)
-        else:
-            console.print("\n💡 跳过上传。如需上传，可以运行:")
-            console.print(f"   [cyan]sage-pypi-publisher upload {wheel_path} -r {repository} --no-dry-run[/cyan]")
+                console.print(f"\n🚀 准备上传到 {repository.upper()}...")
+                compiler = BytecodeCompiler(package_path, mode=mode)  # type: ignore
+                for artifact in built_artifacts:
+                    console.print(f"\n  📤 Uploading: {artifact.name}")
+                    compiler.upload_wheel(artifact, repository=repository, dry_run=dry_run)
+            else:
+                console.print("\n💡 跳过上传。如需上传，可以运行:")
+                console.print(f"   [cyan]sage-pypi-publisher upload <artifact> -r {repository} --no-dry-run[/cyan]")
 
 
 @app.command("build-manylinux")
