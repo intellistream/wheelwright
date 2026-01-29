@@ -704,7 +704,7 @@ setup()
 
         try:
             result = subprocess.run(
-                ["git", "push"],
+                ["git", "push", "--no-verify"],  # Skip pre-push hook to avoid recursion
                 capture_output=True,
                 text=True,
                 cwd=self.package_path,
