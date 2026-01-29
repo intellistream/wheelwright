@@ -206,6 +206,10 @@ class BytecodeCompiler:
                 for line in upload_result.stdout.split("\n"):
                     if "View at:" in line or ("https://" in line and "pypi.org" in line):
                         console.print(f"    🔗 {line.strip()}", style="cyan")
+
+            # Auto-push to GitHub if in a git repository
+            self._auto_push_to_github()
+
             return True
 
         error_msg = upload_result.stderr.strip() if upload_result.stderr else "未知错误"
@@ -663,6 +667,64 @@ setup()
                         console.print(f"       - {f}")
                 else:
                     console.print(f"    ✅ 源码包含 {py_count} 个.py文件", style="green")
+
+    def _auto_push_to_github(self) -> None:
+        """Auto-push to GitHub after successful PyPI upload if in git repo."""
+        # Check if we're in a git repository
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--git-dir"],
+                capture_output=True,
+                text=True,
+                cwd=self.package_path,
+            )
+            if result.returncode != 0:
+                return  # Not a git repo, skip
+        except FileNotFoundError:
+            return  # Git not installed
+
+        # Check if there are commits to push
+        try:
+            result = subprocess.run(
+                ["git", "log", "@{u}..", "--oneline"],
+                capture_output=True,
+                text=True,
+                cwd=self.package_path,
+            )
+            if not result.stdout.strip():
+                return  # No commits to push
+        except Exception:  # noqa: BLE001
+            return  # Can't determine, skip
+
+        console.print("\n🚀 Pushing version commit...", style="cyan")
+
+        # Set environment variable to tell pre-push hook to skip processing
+        env = os.environ.copy()
+        env["SAGE_PYPI_PUBLISHER_PUSHING"] = "1"
+
+        try:
+            result = subprocess.run(
+                ["git", "push"],
+                capture_output=True,
+                text=True,
+                cwd=self.package_path,
+                env=env,
+            )
+            if result.returncode == 0:
+                # Parse output to show summary
+                output = result.stdout + result.stderr
+                console.print(output, style="dim")
+                console.print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                console.print("✅ [green bold]Push completed successfully![/green bold]")
+                console.print("   Version bumped and uploaded to PyPI")
+                console.print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            else:
+                error_output = result.stderr.strip() if result.stderr else "Unknown error"
+                console.print(f"⚠️  Git push failed: {error_output}", style="yellow")
+                console.print("💡 Please run 'git push' manually", style="dim")
+        except Exception as e:  # noqa: BLE001
+            console.print(f"⚠️  Could not auto-push: {e}", style="yellow")
+            console.print("💡 Please run 'git push' manually", style="dim")
 
 
 def compile_multiple_packages(
