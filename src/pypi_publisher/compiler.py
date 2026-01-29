@@ -141,7 +141,7 @@ class BytecodeCompiler:
             os.chdir(original_dir)
 
     def upload_wheel(
-        self, wheel_path: Path, repository: str = "pypi", dry_run: bool = True, auto_push: bool = True
+        self, wheel_path: Path, repository: str = "pypi", dry_run: bool = True, auto_push: bool = False
     ) -> bool:
         repo_name = "TestPyPI" if repository == "testpypi" else "PyPI"
         console.print(f"  🚀 上传到{repo_name}...", style="cyan")
