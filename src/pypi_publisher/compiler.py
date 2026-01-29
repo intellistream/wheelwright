@@ -3,6 +3,7 @@ Bytecode compiler and PyPI publisher toolkit.
 
 Ported from SAGE dev tools, generalized for any Python package directory.
 """
+
 from __future__ import annotations
 
 import os
@@ -68,7 +69,9 @@ class BytecodeCompiler:
             self.temp_dir = Path(output_dir)
             self.temp_dir.mkdir(parents=True, exist_ok=True)
         else:
-            self.temp_dir = Path(tempfile.mkdtemp(prefix=f"pypi_publisher_{self.package_path.name}_"))
+            self.temp_dir = Path(
+                tempfile.mkdtemp(prefix=f"pypi_publisher_{self.package_path.name}_")
+            )
 
         self.compiled_path = self.temp_dir / self.package_path.name
         console.print(f"📁 复制项目结构到: {self.compiled_path}")
@@ -131,13 +134,15 @@ class BytecodeCompiler:
                 raise BuildError("构建完成但未找到wheel文件", package_name=target_path.name)
 
             wheel_file = dist_files[0]
-            console.print(f"    📄 {wheel_file.name} ({wheel_file.stat().st_size/1024:.2f} KB)")
+            console.print(f"    📄 {wheel_file.name} ({wheel_file.stat().st_size / 1024:.2f} KB)")
             self._verify_wheel_contents(wheel_file)
             return wheel_file.resolve()
         finally:
             os.chdir(original_dir)
 
-    def upload_wheel(self, wheel_path: Path, repository: str = "pypi", dry_run: bool = True) -> bool:
+    def upload_wheel(
+        self, wheel_path: Path, repository: str = "pypi", dry_run: bool = True
+    ) -> bool:
         repo_name = "TestPyPI" if repository == "testpypi" else "PyPI"
         console.print(f"  🚀 上传到{repo_name}...", style="cyan")
 
@@ -159,31 +164,43 @@ class BytecodeCompiler:
         try:
             upload_result = subprocess.run(cmd, capture_output=True, text=True)
         except FileNotFoundError as exc:
-            raise UploadError("未找到 twine，请先安装 (pip install twine)", repository=repo_name) from exc
-        
+            raise UploadError(
+                "未找到 twine，请先安装 (pip install twine)", repository=repo_name
+            ) from exc
+
         if upload_result.returncode == 0:
             # 解析输出，区分真正上传和跳过
             output = upload_result.stdout + upload_result.stderr
-            
+
             # 检测是否包含 "Skipping" 或 "File already exists"
-            has_skipped = bool(re.search(r"(Skipping|File already exists|already been uploaded)", output, re.IGNORECASE))
+            has_skipped = bool(
+                re.search(
+                    r"(Skipping|File already exists|already been uploaded)", output, re.IGNORECASE
+                )
+            )
             # 检测是否有真正的上传
             has_uploaded = bool(re.search(r"(Uploading|Uploaded)", output, re.IGNORECASE))
-            
+
             if has_uploaded and not has_skipped:
                 # 完全新上传
                 console.print(f"  ✅ 已上传新版本到{repo_name}", style="green bold")
             elif has_skipped and not has_uploaded:
                 # 全部跳过
-                console.print(f"  ℹ️  版本已存在，跳过上传", style="yellow")
+                console.print("  ℹ️  版本已存在，跳过上传", style="yellow")
                 console.print(f"    提示：无需重新上传，{repo_name}已有此版本", style="dim")
             elif has_uploaded and has_skipped:
                 # 部分上传，部分跳过
-                console.print(f"  ⚠️  部分文件已上传，部分已存在", style="yellow")
+                console.print("  ⚠️  部分文件已上传，部分已存在", style="yellow")
             else:
                 # 无法判断，使用原来的提示
                 console.print(f"  ✅ 上传到{repo_name}成功", style="green")
-            
+
+            # 重要提示：只上传了 PyPI，还需要推送到 GitHub
+            console.print(
+                f"\n  💡 [yellow]注意：仅上传到{repo_name}，代码尚未推送到 GitHub[/yellow]"
+            )
+            console.print("     [dim]（pre-push hook 会在 git push 时自动推送）[/dim]")
+
             # 显示 PyPI 链接
             if upload_result.stdout:
                 for line in upload_result.stdout.split("\n"):
@@ -196,7 +213,7 @@ class BytecodeCompiler:
 
     def build_universal_wheel(self, compiled_path: Path | None = None) -> Path:
         """Build a universal pure Python wheel (py3-none-any).
-        
+
         This is suitable for pure Python packages without C extensions.
         The wheel will be compatible with all Python 3 versions.
         """
@@ -212,7 +229,7 @@ class BytecodeCompiler:
             if Path("build").exists():
                 shutil.rmtree("build")
                 console.print("  🧹 清理目录: build")
-            
+
             # Ensure dist directory exists
             Path("dist").mkdir(exist_ok=True)
 
@@ -228,7 +245,7 @@ class BytecodeCompiler:
                 raise BuildError("构建完成但未找到wheel文件", package_name=target_path.name)
 
             wheel_file = dist_files[0]
-            console.print(f"    📄 {wheel_file.name} ({wheel_file.stat().st_size/1024:.2f} KB)")
+            console.print(f"    📄 {wheel_file.name} ({wheel_file.stat().st_size / 1024:.2f} KB)")
             console.print("    ✓ 该wheel支持所有Python 3版本", style="green")
             return wheel_file.resolve()
         finally:
@@ -236,7 +253,7 @@ class BytecodeCompiler:
 
     def build_sdist(self, compiled_path: Path | None = None) -> Path:
         """Build a source distribution (.tar.gz).
-        
+
         Source distributions allow users to install from source and are
         compatible with any Python version.
         """
@@ -252,7 +269,7 @@ class BytecodeCompiler:
             if Path("build").exists():
                 shutil.rmtree("build")
                 console.print("  🧹 清理目录: build")
-            
+
             # Ensure dist directory exists
             Path("dist").mkdir(exist_ok=True)
 
@@ -268,7 +285,7 @@ class BytecodeCompiler:
                 raise BuildError("构建完成但未找到sdist文件", package_name=target_path.name)
 
             sdist_file = dist_files[0]
-            console.print(f"    📄 {sdist_file.name} ({sdist_file.stat().st_size/1024:.2f} KB)")
+            console.print(f"    📄 {sdist_file.name} ({sdist_file.stat().st_size / 1024:.2f} KB)")
             console.print("    ✓ 源码分发包可在所有Python版本上安装", style="green")
             return sdist_file.resolve()
         finally:
@@ -289,7 +306,9 @@ class BytecodeCompiler:
             console.print("  ⚠️ 没有找到需要编译的Python文件", style="yellow")
             return
 
-        console.print(f"  📝 找到 {len(files_to_compile)} 个Python文件需要编译 (跳过 {skipped_count} 个)")
+        console.print(
+            f"  📝 找到 {len(files_to_compile)} 个Python文件需要编译 (跳过 {skipped_count} 个)"
+        )
         self._preserve_binary_extensions()
         with Progress() as progress:
             task = progress.add_task("编译Python文件", total=len(files_to_compile))
@@ -378,25 +397,31 @@ class BytecodeCompiler:
         requires_python_pattern = r'(requires-python\s*=\s*["\'])([^"\']+)(["\'])'
         if re.search(requires_python_pattern, content):
             old_content = content
-            content = re.sub(requires_python_pattern, rf'\1{exact_version}\3', content)
+            content = re.sub(requires_python_pattern, rf"\1{exact_version}\3", content)
             if content != old_content:
-                console.print(f"  🐍 设置Python版本约束: {exact_version} (字节码兼容)", style="yellow")
+                console.print(
+                    f"  🐍 设置Python版本约束: {exact_version} (字节码兼容)", style="yellow"
+                )
         else:
             # Add requires-python to [project] section if missing
-            project_pattern = r'(\[project\][^\[]*?)((?=\[)|$)'
+            project_pattern = r"(\[project\][^\[]*?)((?=\[)|$)"
             match = re.search(project_pattern, content, re.DOTALL)
             if match:
                 project_section = match.group(1)
-                if 'requires-python' not in project_section:
-                    updated_section = project_section.rstrip() + f'\nrequires-python = "{exact_version}"\n'
+                if "requires-python" not in project_section:
+                    updated_section = (
+                        project_section.rstrip() + f'\nrequires-python = "{exact_version}"\n'
+                    )
                     content = content.replace(project_section, updated_section)
-                    console.print(f"  🐍 添加Python版本约束: {exact_version} (字节码兼容)", style="yellow")
+                    console.print(
+                        f"  🐍 添加Python版本约束: {exact_version} (字节码兼容)", style="yellow"
+                    )
 
         uses_scikit_build = "scikit_build_core" in content
         if uses_scikit_build:
             console.print("  🔧 检测到 scikit-build-core，切换到 setuptools", style="yellow")
             content = re.sub(
-                r'build-backend\s*=\s*[\"\']scikit_build_core\.build[\"\']',
+                r"build-backend\s*=\s*[\"\']scikit_build_core\.build[\"\']",
                 'build-backend = "setuptools.build_meta"',
                 content,
             )
@@ -456,17 +481,29 @@ include-package-data = true
                                         item = item.strip().strip('"').strip("'")
                                         if item and item not in all_items:
                                             all_items.append(item)
-                            for pattern_item in ["*.pyc", "*.pyo", "__pycache__/*", "*.so", "*.pyd", "*.dylib"]:
+                            for pattern_item in [
+                                "*.pyc",
+                                "*.pyo",
+                                "__pycache__/*",
+                                "*.so",
+                                "*.pyd",
+                                "*.dylib",
+                            ]:
                                 if pattern_item not in all_items:
                                     all_items.append(pattern_item)
                             formatted_items = ",\n    ".join(f'"{it}"' for it in all_items)
                             updated_line = f'"*" = [\n    {formatted_items},\n]'
-                            updated_data = existing_data.replace(star_matches[0].group(0), updated_line)
+                            updated_data = existing_data.replace(
+                                star_matches[0].group(0), updated_line
+                            )
                             for m in star_matches[1:]:
                                 updated_data = updated_data.replace(m.group(0), "")
                             updated_data = re.sub(r"\n\s*\n\s*\n", "\n\n", updated_data)
                         else:
-                            updated_data = existing_data.rstrip() + '\n"*" = ["*.pyc", "*.pyo", "__pycache__/*", "*.so", "*.pyd", "*.dylib"]\n'
+                            updated_data = (
+                                existing_data.rstrip()
+                                + '\n"*" = ["*.pyc", "*.pyo", "__pycache__/*", "*.so", "*.pyd", "*.dylib"]\n'
+                            )
                         content = content.replace(existing_data, updated_data)
                         modified = True
             else:
@@ -507,11 +544,6 @@ setup(
             encoding="utf-8",
         )
 
-
-
-
-
-
         if modified or uses_scikit_build:
             pyproject_file.write_text(content, encoding="utf-8")
             console.print("  ✅ 更新pyproject.toml配置", style="green")
@@ -537,7 +569,7 @@ setup(
         if uses_scikit_build:
             console.print("  🔧 检测到 scikit-build-core，切换到 setuptools", style="yellow")
             content = re.sub(
-                r'build-backend\s*=\s*[\"\']scikit_build_core\.build[\"\']',
+                r"build-backend\s*=\s*[\"\']scikit_build_core\.build[\"\']",
                 'build-backend = "setuptools.build_meta"',
                 content,
             )
@@ -599,7 +631,6 @@ setup()
             console.print("  ✅ 更新pyproject.toml配置 (公开模式)", style="green")
         else:
             console.print("  ✓ pyproject.toml配置已满足要求", style="dim")
-
 
     def _verify_wheel_contents(self, wheel_file: Path):
         console.print("  🔍 验证wheel包内容...", style="cyan")

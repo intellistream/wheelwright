@@ -4,6 +4,7 @@ Manylinux wheel builder for packages with C/C++ extensions.
 Handles platform tag modifications for packages that can't use auditwheel
 (e.g., packages with external dependencies like MKL, FAISS, CUDA).
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -51,6 +52,7 @@ class ManylinuxBuilder:
         dist_dir = self.package_path / "dist"
         if dist_dir.exists():
             import shutil
+
             shutil.rmtree(dist_dir)
 
         # Build the wheel
@@ -94,6 +96,7 @@ class ManylinuxBuilder:
             final_path.unlink()
 
         import shutil
+
         shutil.move(str(manylinux_wheel), str(final_path))
 
         console.print(f"✅ Created manylinux wheel: {final_path.name}", style="green")
@@ -178,6 +181,7 @@ class ManylinuxBuilder:
 
             # Move to a persistent location before temp_dir is cleaned up
             import shutil
+
             final_wheel = wheel_file.parent / new_filename
             shutil.copy(str(repacked_wheel), str(final_wheel))
 
