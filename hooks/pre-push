@@ -218,8 +218,8 @@ if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "HEAD" ]; then
         echo -e "${RED}✗ Failed to push to origin/${CURRENT_BRANCH}${NC}"
         exit $PUSH_STATUS
     fi
-    # 阻止 git 的默认 push 行为（因为我们已经手动推送了）
-    exit 1
+    # 让 git 继续执行原始 push 行为（会显示 "Everything up-to-date"，无害）
+    exit 0
 fi
 
 exit 0

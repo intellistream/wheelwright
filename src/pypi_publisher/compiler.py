@@ -196,10 +196,14 @@ class BytecodeCompiler:
                 console.print(f"  ✅ 上传到{repo_name}成功", style="green")
 
             # 重要提示：只上传了 PyPI，还需要推送到 GitHub
-            console.print(
-                f"\n  💡 [yellow]注意：仅上传到{repo_name}，代码尚未推送到 GitHub[/yellow]"
-            )
-            console.print("     [dim]（pre-push hook 会在 git push 时自动推送）[/dim]")
+            # 如果从 pre-push hook 调用（SAGE_PYPI_PUBLISHER_PUSHING 或 GIT_PUSH_OPTION_COUNT 环境变量存在）
+            # 或者 auto_push=True，则不显示此提示，因为代码会被推送
+            from_prepush_hook = os.environ.get("GIT_PUSH_OPTION_COUNT") is not None
+            if not auto_push and not from_prepush_hook:
+                console.print(
+                    f"\n  💡 [yellow]注意：仅上传到{repo_name}，代码尚未推送到 GitHub[/yellow]"
+                )
+                console.print("     [dim]（请手动执行 git push 或使用 --auto-push 选项）[/dim]")
 
             # 显示 PyPI 链接
             if upload_result.stdout:
