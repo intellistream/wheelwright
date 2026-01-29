@@ -141,7 +141,7 @@ class BytecodeCompiler:
             os.chdir(original_dir)
 
     def upload_wheel(
-        self, wheel_path: Path, repository: str = "pypi", dry_run: bool = True
+        self, wheel_path: Path, repository: str = "pypi", dry_run: bool = True, auto_push: bool = True
     ) -> bool:
         repo_name = "TestPyPI" if repository == "testpypi" else "PyPI"
         console.print(f"  🚀 上传到{repo_name}...", style="cyan")
@@ -207,8 +207,9 @@ class BytecodeCompiler:
                     if "View at:" in line or ("https://" in line and "pypi.org" in line):
                         console.print(f"    🔗 {line.strip()}", style="cyan")
 
-            # Auto-push to GitHub if in a git repository
-            self._auto_push_to_github()
+            # Auto-push to GitHub if enabled and in a git repository
+            if auto_push:
+                self._auto_push_to_github()
 
             return True
 

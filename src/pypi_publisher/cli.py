@@ -117,6 +117,9 @@ def build(
         False, "--universal", help="Force universal wheel (py3-none-any) - overrides smart mode"
     ),
     sdist: bool = typer.Option(False, "--sdist", help="Also build source distribution (.tar.gz)"),
+    auto_push: bool = typer.Option(
+        True, "--auto-push/--no-auto-push", help="Auto-push to GitHub after upload (default: True)"
+    ),
 ):
     """
     Smart build: auto-detects package type and builds appropriately.
@@ -258,7 +261,7 @@ def build(
         compiler = BytecodeCompiler(package_path, mode=mode)  # type: ignore
         for artifact in built_artifacts:
             console.print(f"\n  📤 Uploading: {artifact.name}")
-            compiler.upload_wheel(artifact, repository=repository, dry_run=dry_run)
+            compiler.upload_wheel(artifact, repository=repository, dry_run=dry_run, auto_push=auto_push)
     else:
         # Ask user if they want to upload
         console.print("\n📦 Built artifacts:")
