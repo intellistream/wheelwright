@@ -204,4 +204,22 @@ else
     fi
 fi
 
+# 🔧 自动推送到当前分支（而非硬编码的 main）
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "HEAD" ]; then
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BLUE}📤 Pushing to ${GREEN}origin/${CURRENT_BRANCH}${NC}"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    git push origin "$CURRENT_BRANCH"
+    PUSH_STATUS=$?
+    if [ $PUSH_STATUS -eq 0 ]; then
+        echo -e "${GREEN}✓ Successfully pushed to origin/${CURRENT_BRANCH}${NC}"
+    else
+        echo -e "${RED}✗ Failed to push to origin/${CURRENT_BRANCH}${NC}"
+        exit $PUSH_STATUS
+    fi
+    # 阻止 git 的默认 push 行为（因为我们已经手动推送了）
+    exit 1
+fi
+
 exit 0
