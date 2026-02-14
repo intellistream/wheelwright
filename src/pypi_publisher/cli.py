@@ -118,7 +118,9 @@ def build(
     ),
     sdist: bool = typer.Option(False, "--sdist", help="Also build source distribution (.tar.gz)"),
     auto_push: bool = typer.Option(
-        False, "--auto-push/--no-auto-push", help="Auto-push to GitHub after upload (default: False)"
+        False,
+        "--auto-push/--no-auto-push",
+        help="Auto-push to GitHub after upload (default: False)",
     ),
 ):
     """
@@ -261,7 +263,9 @@ def build(
         compiler = BytecodeCompiler(package_path, mode=mode)  # type: ignore
         for artifact in built_artifacts:
             console.print(f"\n  📤 Uploading: {artifact.name}")
-            compiler.upload_wheel(artifact, repository=repository, dry_run=dry_run, auto_push=auto_push)
+            compiler.upload_wheel(
+                artifact, repository=repository, dry_run=dry_run, auto_push=auto_push
+            )
     else:
         # Ask user if they want to upload
         console.print("\n📦 Built artifacts:")
@@ -284,7 +288,9 @@ def build(
                 compiler = BytecodeCompiler(package_path, mode=mode)  # type: ignore
                 for artifact in built_artifacts:
                     console.print(f"\n  📤 Uploading: {artifact.name}")
-                    compiler.upload_wheel(artifact, repository=repository, dry_run=dry_run, auto_push=False)
+                    compiler.upload_wheel(
+                        artifact, repository=repository, dry_run=dry_run, auto_push=False
+                    )
             else:
                 console.print("\n💡 跳过上传。如需上传，可以运行:")
                 console.print(
