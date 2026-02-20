@@ -728,7 +728,12 @@ def publish(
         console.print(f"   Mode: [cyan]{mode_name}[/cyan]")
         compiler = BytecodeCompiler(package_path, mode=mode)  # type: ignore
         compiled = compiler.compile_package(None)
-        wheel_path = compiler.build_wheel(compiled)
+        # Pure Python packages (even in private/bytecode mode) → py3-none-any wheel,
+        # consistent with the `build` command's smart-mode behaviour.
+        if build_system == "pure-python" or mode in ("public", "source"):
+            wheel_path = compiler.build_universal_wheel(compiled)
+        else:
+            wheel_path = compiler.build_wheel(compiled)
 
     console.print(f"   [green]✓ Built: {wheel_path.name}[/green]\n")
 
