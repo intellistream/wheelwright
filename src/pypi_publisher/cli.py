@@ -51,6 +51,30 @@ console = Console()
 app = typer.Typer(name="sage-pypi-publisher", add_completion=False, no_args_is_help=True)
 
 
+def _load_keep_source_patterns(package_path: Path) -> list[str]:
+    """Read [tool.sage-pypi-publisher] keep_source list from pyproject.toml.
+
+    Allows packages to specify which .py files must be kept as source
+    (not compiled to .pyc) in private-mode builds, e.g. for Triton kernels
+    that require inspect.getsourcelines() at JIT-compilation time.
+
+    Example in pyproject.toml::
+
+        [tool.sage-pypi-publisher]
+        keep_source = [
+            "src/mypkg/kernels/fused_ops.py",
+        ]
+    """
+    pyproject = package_path / "pyproject.toml"
+    if not pyproject.exists():
+        return []
+    try:
+        data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+        return data.get("tool", {}).get("sage-pypi-publisher", {}).get("keep_source", [])
+    except Exception:  # noqa: BLE001
+        return []
+
+
 @app.command()
 def compile(
     package_path: Path = typer.Argument(
@@ -75,7 +99,9 @@ def compile(
 
     - public/source: Keep .py source files (公开模式 - 开源发布)
     """
-    compiler = BytecodeCompiler(package_path, mode=mode)  # type: ignore
+    compiler = BytecodeCompiler(
+        package_path, mode=mode, keep_source_patterns=_load_keep_source_patterns(package_path)
+    )  # type: ignore
     compiled = compiler.compile_package(output_dir)
     console.print(f"[bold green]✓ 编译完成: {compiled}[/bold green]")
 
@@ -200,7 +226,9 @@ def build(
         console.print(f"🔧 Building as pure Python package - {mode_name}...")
 
         # Initialize compiler
-        compiler = BytecodeCompiler(package_path, mode=mode)  # type: ignore
+        compiler = BytecodeCompiler(
+            package_path, mode=mode, keep_source_patterns=_load_keep_source_patterns(package_path)
+        )  # type: ignore
         compiled = compiler.compile_package(output_dir)
 
         # Check if user explicitly wants manual control

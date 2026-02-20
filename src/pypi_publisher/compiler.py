@@ -6,6 +6,7 @@ Ported from SAGE dev tools, generalized for any Python package directory.
 
 from __future__ import annotations
 
+import fnmatch
 import os
 import py_compile
 import re
@@ -37,11 +38,15 @@ class BytecodeCompiler:
         package_path: Path,
         temp_dir: Path | None = None,
         mode: BuildMode = "private",
+        keep_source_patterns: list[str] | None = None,
     ):
         self.package_path = Path(package_path)
         self.temp_dir = temp_dir
         self.compiled_path: Path | None = None
         self._binary_extensions: list[Path] = []
+        # Glob patterns (relative to package root) whose .py files are preserved
+        # even in private mode, e.g. ["src/mypkg/kernels/fused_ops.py"]
+        self.keep_source_patterns: list[str] = keep_source_patterns or []
 
         # Normalize mode: private/bytecode → private, public/source → public
         if mode in ("private", "bytecode"):
@@ -141,7 +146,11 @@ class BytecodeCompiler:
             os.chdir(original_dir)
 
     def upload_wheel(
-        self, wheel_path: Path, repository: str = "pypi", dry_run: bool = True, auto_push: bool = False
+        self,
+        wheel_path: Path,
+        repository: str = "pypi",
+        dry_run: bool = True,
+        auto_push: bool = False,
     ) -> bool:
         repo_name = "TestPyPI" if repository == "testpypi" else "PyPI"
         console.print(f"  🚀 上传到{repo_name}...", style="cyan")
@@ -388,7 +397,16 @@ class BytecodeCompiler:
 
     def _should_keep_source(self, py_file: Path) -> bool:
         keep_files = ["setup.py", "_version.py", "__init__.py"]
-        return py_file.name in keep_files
+        if py_file.name in keep_files:
+            return True
+        if self.keep_source_patterns and self.compiled_path:
+            # Match against path relative to the compiled package directory
+            rel = str(py_file.relative_to(self.compiled_path)).replace(os.sep, "/")
+            for pattern in self.keep_source_patterns:
+                pat = pattern.replace(os.sep, "/")
+                if fnmatch.fnmatch(rel, pat) or fnmatch.fnmatch(py_file.name, pat):
+                    return True
+        return False
 
     def _update_pyproject(self):
         assert self.compiled_path
@@ -524,30 +542,45 @@ include-package-data = true
 
         content = re.sub(r"\n\n\n+", "\n\n", content)
 
+        manifest_lines = [
+            "# Include compiled files and binary extensions",
+            "recursive-include src *.pyc",
+            "recursive-include src *.pyo",
+            "recursive-include src __pycache__/*",
+            "recursive-include src *.so",
+            "recursive-include src *.pyd",
+            "recursive-include src *.dylib",
+        ]
+        if self.keep_source_patterns:
+            manifest_lines.append("# Kept .py source files (required by JIT compilers e.g. Triton)")
+            for pat in self.keep_source_patterns:
+                manifest_lines.append(f"global-include {pat}")
         manifest_file = self.compiled_path / "MANIFEST.in"
-        manifest_file.write_text(
-            """
-# Include compiled files and binary extensions
-recursive-include src *.pyc
-recursive-include src *.pyo
-recursive-include src __pycache__/*
-recursive-include src *.so
-recursive-include src *.pyd
-recursive-include src *.dylib
-""",
-            encoding="utf-8",
-        )
+        manifest_file.write_text("\n".join(manifest_lines) + "\n", encoding="utf-8")
+
+        # Build package_data patterns for setup.py
+        _pkg_data_items = [
+            '"*.pyc"',
+            '"*.pyo"',
+            '"__pycache__/*"',
+            '"*.so"',
+            '"*.pyd"',
+            '"*.dylib"',
+        ]
+        if self.keep_source_patterns:
+            _pkg_data_items.append('"*.py"')  # keep all kept .py accessible under package data
+        _pkg_data_str = ", ".join(_pkg_data_items)
 
         setup_py_file = self.compiled_path / "setup.py"
         setup_py_file.write_text(
-            """
+            f"""
 from setuptools import setup
 
 setup(
     include_package_data=True,
-    package_data={
-        "": ["*.pyc", "*.pyo", "__pycache__/*", "*.so", "*.pyd", "*.dylib"],
-    },
+    package_data={{
+        "": [{_pkg_data_str}],
+    }},
 )
 """,
             encoding="utf-8",
