@@ -149,6 +149,11 @@ When compiling, automatically update:
 - **Python Version**: Maintain 3.10+ compatibility
 - **Compatibility**: Use `tomli` for Python <3.11 (tomllib backport)
 
+## Environment Policy (Mandatory)
+- **Do Not Create venv**: Never create `venv`/`.venv` for this repository or workspace.
+- **Use Existing Environment**: Reuse the already activated Python environment (e.g. existing conda env).
+- **No Auto Environment Bootstrap**: Do not run environment initialization commands that create new virtual environments.
+
 ## Best Practices for Copilot
 
 1. **Type Safety**: Always add type hints for function parameters and returns
