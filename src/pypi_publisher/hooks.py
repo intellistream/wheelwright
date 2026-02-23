@@ -1,4 +1,5 @@
 """Git hooks management for sage-pypi-publisher."""
+
 from __future__ import annotations
 
 import stat
@@ -8,7 +9,7 @@ from rich.console import Console
 
 console = Console()
 
-PRE_PUSH_HOOK_TEMPLATE = '''#!/bin/bash
+PRE_PUSH_HOOK_TEMPLATE = """#!/bin/bash
 # Pre-push hook managed by sage-pypi-publisher
 # Auto-detects version updates and offers to build/upload to PyPI
 
@@ -139,9 +140,9 @@ else
 fi
 
 exit 0
-'''
+"""
 
-PRE_COMMIT_HOOK_TEMPLATE = '''#!/bin/bash
+PRE_COMMIT_HOOK_TEMPLATE = """#!/bin/bash
 # Pre-commit hook managed by sage-pypi-publisher
 # Runs code quality checks (ruff, mypy) if available
 
@@ -188,7 +189,7 @@ else
 fi
 
 echo -e "${GREEN}✓ All checks passed!${NC}"
-'''
+"""
 
 
 def install_git_hooks(package_path: Path | None = None) -> bool:
@@ -244,8 +245,11 @@ def install_git_hooks(package_path: Path | None = None) -> bool:
     if pre_push_hook.exists():
         backup_path = hooks_dir / "pre-push.backup"
         if "sage-pypi-publisher" not in pre_push_hook.read_text():
-            console.print(f"[yellow]Backing up existing pre-push hook to {backup_path.name}[/yellow]")
+            console.print(
+                f"[yellow]Backing up existing pre-push hook to {backup_path.name}[/yellow]"
+            )
             import shutil
+
             shutil.copy(pre_push_hook, backup_path)
 
     # Write new pre-push hook
@@ -259,13 +263,18 @@ def install_git_hooks(package_path: Path | None = None) -> bool:
     if pre_commit_hook.exists():
         backup_path = hooks_dir / "pre-commit.backup"
         if "sage-pypi-publisher" not in pre_commit_hook.read_text():
-            console.print(f"[yellow]Backing up existing pre-commit hook to {backup_path.name}[/yellow]")
+            console.print(
+                f"[yellow]Backing up existing pre-commit hook to {backup_path.name}[/yellow]"
+            )
             import shutil
+
             shutil.copy(pre_commit_hook, backup_path)
 
     # Write new pre-commit hook
     pre_commit_hook.write_text(PRE_COMMIT_HOOK_TEMPLATE, encoding="utf-8")
-    pre_commit_hook.chmod(pre_commit_hook.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    pre_commit_hook.chmod(
+        pre_commit_hook.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+    )
 
     console.print("[green]✓ Git hooks installed successfully[/green]")
     console.print(f"[cyan]Location: {hooks_dir}[/cyan]")
@@ -307,6 +316,7 @@ def uninstall_git_hooks(package_path: Path | None = None) -> bool:
             if backup_path.exists():
                 console.print("[cyan]Restoring pre-push backup...[/cyan]")
                 import shutil
+
                 shutil.copy(backup_path, pre_push_hook)
                 backup_path.unlink()
             else:
@@ -321,6 +331,7 @@ def uninstall_git_hooks(package_path: Path | None = None) -> bool:
             if backup_path.exists():
                 console.print("[cyan]Restoring pre-commit backup...[/cyan]")
                 import shutil
+
                 shutil.copy(backup_path, pre_commit_hook)
                 backup_path.unlink()
             else:

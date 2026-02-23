@@ -1,4 +1,5 @@
 """Detect package build system and type."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -39,7 +40,9 @@ def detect_build_system(package_path: Path) -> str:
 
     for req in requires:
         req_lower = req.lower()
-        if any(marker in req_lower for marker in ["scikit-build", "pybind11", "cython", "meson-python"]):
+        if any(
+            marker in req_lower for marker in ["scikit-build", "pybind11", "cython", "meson-python"]
+        ):
             return "extension"
 
     # If using setuptools, check for CMakeLists.txt or other signs

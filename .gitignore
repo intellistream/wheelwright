@@ -45,3 +45,5 @@ htmlcov/
 .DS_Store
 Thumbs.db
 .env
+src/*
+.sage/*

@@ -184,3 +184,4 @@ sage-pypi-publisher install-hooks .
 - Requires `python -m build` and `twine` available.
 - No backward compatibility with `sage-dev` CLI; PyPI commands have been removed from SAGE.
 - Designed to be monorepo-friendly but works with any package path that contains `pyproject.toml`.
+# Test commit
