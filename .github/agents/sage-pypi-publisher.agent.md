@@ -13,6 +13,7 @@ tools: ['vscode', 'execute', 'read', 'agent', 'edit', 'search', 'web', 'todo', '
 ## Rules
 - Keep strong typing and Google-style docstrings.
 - Preserve compile policy (`__init__.py` and `_version.py` source retention).
+- Do not create new local virtual environments (`venv`/`.venv`); use the existing configured Python environment.
 - Use explicit exception types (`CompilationError`, `BuildError`, `UploadError`).
 - Keep user output concise and consistent with Rich.
 
