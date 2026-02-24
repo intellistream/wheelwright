@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "isage-pypi-publisher"
-version = "0.1.9.9"
+dynamic = ["version"]
 description = "Python bytecode compiler and PyPI publishing toolkit for monorepos"
 readme = "README.md"
 license = {text = "MIT"}
@@ -70,6 +70,9 @@ where = ["src"]
 [tool.setuptools.package-data]
 "*" = ["py.typed", "*.pyi"]
 
+[tool.setuptools.dynamic]
+version = {attr = "pypi_publisher._version.__version__"}
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"
@@ -89,4 +92,3 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
-

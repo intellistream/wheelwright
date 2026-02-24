@@ -46,14 +46,9 @@ if [ ! -d "$HOOKS_DIR" ]; then
     exit 1
 fi
 
-# Install pre-commit hook
-if [ -f "$TEMPLATE_DIR/pre-commit" ]; then
-    cp "$TEMPLATE_DIR/pre-commit" "$HOOKS_DIR/pre-commit"
-    chmod +x "$HOOKS_DIR/pre-commit"
-    echo -e "${GREEN}✓ Installed pre-commit hook${NC}"
-else
-    echo -e "${YELLOW}⚠  pre-commit template not found, skipping${NC}"
-fi
+# Install pre-commit hook via pre-commit framework
+pre-commit install
+echo -e "${GREEN}✓ Installed pre-commit hook (pre-commit install)${NC}"
 
 # Install pre-push hook
 if [ -f "$TEMPLATE_DIR/pre-push" ]; then
@@ -62,6 +57,15 @@ if [ -f "$TEMPLATE_DIR/pre-push" ]; then
     echo -e "${GREEN}✓ Installed pre-push hook${NC}"
 else
     echo -e "${YELLOW}⚠  pre-push template not found, skipping${NC}"
+fi
+
+# Install post-commit hook
+if [ -f "$TEMPLATE_DIR/post-commit" ]; then
+    cp "$TEMPLATE_DIR/post-commit" "$HOOKS_DIR/post-commit"
+    chmod +x "$HOOKS_DIR/post-commit"
+    echo -e "${GREEN}✓ Installed post-commit hook${NC}"
+else
+    echo -e "${YELLOW}⚠  post-commit template not found, skipping${NC}"
 fi
 
 echo ""
