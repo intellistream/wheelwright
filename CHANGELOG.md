@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- CI 新增 `pytest tests/` 单元测试步骤，并对 `detector` / `exceptions` 模块输出覆盖率报告，确保发布工具仓库具备基础 unit test 门禁。
+- 新增 `tests/test_detector.py` 与 `tests/test_exceptions.py`，覆盖构建系统识别与异常上下文行为。
+
 ### Fixed
 - CI `Version Source Guard` script indentation corrected in workflow, resolving guard job syntax failure.
 

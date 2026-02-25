@@ -35,6 +35,13 @@ jobs:
       - name: Ruff format check
         run: ruff format --check src/
 
+      - name: Run unit tests
+        run: |
+          pytest tests/ -v \
+            --cov=pypi_publisher.exceptions \
+            --cov=pypi_publisher.detector \
+            --cov-report=term
+
   version-source-guard:
     name: Version Source Guard
     runs-on: ubuntu-latest
