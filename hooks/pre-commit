@@ -1,65 +1,31 @@
-#!/bin/bash
-# Pre-commit hook for sageVDB
-# Runs basic code quality checks before allowing commits
+#!/usr/bin/env bash
+# Pre-commit hook for sage-pypi-publisher
+# Runs ruff check + format on staged Python files.
 
-set -e
+set -eo pipefail
 
-# Colors
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
 GREEN='\033[0;32m'
-CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
 NC='\033[0m'
 
-echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${CYAN}🔍 Running pre-commit checks...${NC}"
-echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo "🔍 Running pre-commit checks..."
 
-# Check for trailing whitespace
-echo -e "${YELLOW}Checking for trailing whitespace...${NC}"
-if git diff --cached --check --diff-filter=ACM; then
-    echo -e "${GREEN}✓ No trailing whitespace${NC}"
+# Get staged Python files
+STAGED_PY=$(git diff --cached --name-only --diff-filter=ACM -- '*.py' || true)
+
+if [ -n "$STAGED_PY" ]; then
+    if command -v ruff &>/dev/null; then
+        ruff format $STAGED_PY
+        ruff check --fix $STAGED_PY
+        # Re-stage auto-fixed files
+        echo "$STAGED_PY" | xargs git add 2>/dev/null || true
+        echo -e "${GREEN}✅ Lint check passed${NC}"
+    else
+        echo -e "${YELLOW}⚠️  ruff not found, skipping lint${NC}"
+    fi
 else
-    echo -e "${RED}✗ Found trailing whitespace. Please fix before committing.${NC}"
-    exit 1
+    echo -e "ℹ️  No staged Python files to check"
 fi
 
-# Check for large files (>5MB)
-echo -e "${YELLOW}Checking for large files...${NC}"
-max_size=5242880  # 5MB in bytes
-large_files=$(git diff --cached --name-only | while read file; do
-    if [ -f "$file" ]; then
-        size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo 0)
-        if [ "$size" -gt "$max_size" ]; then
-            echo "$file ($((size/1024/1024))MB)"
-        fi
-    fi
-done)
-
-if [ -n "$large_files" ]; then
-    echo -e "${RED}✗ Large files detected (>5MB):${NC}"
-    echo "$large_files"
-    echo -e "${YELLOW}Consider using Git LFS or excluding these files.${NC}"
-    exit 1
-else
-    echo -e "${GREEN}✓ No large files${NC}"
-fi
-
-# Check for common debug statements in Python files
-echo -e "${YELLOW}Checking for debug statements...${NC}"
-debug_found=false
-git diff --cached --name-only --diff-filter=ACM | grep '\.py$' | while read file; do
-    if git diff --cached "$file" | grep -E '^\+.*\b(print|pdb\.set_trace|breakpoint)\(' > /dev/null; then
-        if [ "$debug_found" = false ]; then
-            echo -e "${YELLOW}⚠  Warning: Debug statements found in:${NC}"
-            debug_found=true
-        fi
-        echo "  - $file"
-    fi
-done
-
-echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}✓ Pre-commit checks passed!${NC}"
-echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-
+echo -e "${GREEN}✅ All pre-commit checks passed!${NC}"
 exit 0

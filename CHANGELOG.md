@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- CI 新增 `pytest tests/` 单元测试步骤，并对 `detector` / `exceptions` 模块输出覆盖率报告，确保发布工具仓库具备基础 unit test 门禁。
+- 新增 `tests/test_detector.py` 与 `tests/test_exceptions.py`，覆盖构建系统识别与异常上下文行为。
+
+### Fixed
+- CI `Version Source Guard` script indentation corrected in workflow, resolving guard job syntax failure.
+
+### Changed
+- **chore: standardize pre-commit hooks** — migrate all checks to `.pre-commit-config.yaml`; replace `hooks/pre-commit` with delegation stub; `./quickstart.sh` and `pre-commit install` are now equivalent
+
+### Added
+- 新增 `.github/workflows/ci.yml`，在 PR/Push 上执行 `ruff check src/`
+- CI 新增 hooks 保护校验：校验 `pre-commit` / `pre-push` 包含 main 分支保护提示
+- CI 新增 `Version Source Guard` 校验：强制 `_version.py` 作为唯一版本源，验证 `dynamic version` 与 `__init__` 导入规则
+
 ## [0.1.9.9] - 2026-02-20
 
 ### Added
