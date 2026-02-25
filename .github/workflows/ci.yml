@@ -83,7 +83,7 @@ jobs:
               raise SystemExit('[FAIL] _version.py must define __version__')
 
           init_text = init_file.read_text(encoding='utf-8')
-            if not re.search(r'^from\s+pypi_publisher\._version\s+import\s+.*__version__', init_text, re.M):
+          if not re.search(r'^from\s+pypi_publisher\._version\s+import\s+.*__version__', init_text, re.M):
               raise SystemExit('[FAIL] __init__.py must import __version__ from _version.py')
 
           if re.search(r'^__version__\s*=\s*"[^"]+"\s*$', init_text, re.M):
