@@ -5,6 +5,7 @@ on:
     branches: [main, main-dev]
   pull_request:
     branches: [main, main-dev]
+  workflow_dispatch:
 
 jobs:
   lint-and-validate:
@@ -58,26 +59,35 @@ jobs:
           from __future__ import annotations
 
           import re
+          import sys
           from pathlib import Path
 
           root = Path('.')
           pyproject = root / 'pyproject.toml'
-          content = pyproject.read_text(encoding='utf-8')
+          if sys.version_info < (3, 11):
+            raise RuntimeError('Python 3.11+ is required for tomllib')
 
-          if re.search(r'^version\s*=\s*"', content, re.M):
-              raise SystemExit('[FAIL] project.version must not be hardcoded')
+          import tomllib
 
-          if not re.search(r'^dynamic\s*=\s*\[\s*"version"\s*\]', content, re.M):
-              raise SystemExit('[FAIL] [project].dynamic must include "version"')
+          data = tomllib.loads(pyproject.read_text(encoding='utf-8'))
 
-          if not re.search(
-              r'^version\s*=\s*\{\s*attr\s*=\s*"pypi_publisher\._version\.__version__"\s*\}',
-              content,
-              re.M,
-          ):
-              raise SystemExit(
-                  '[FAIL] [tool.setuptools.dynamic].version.attr must point to pypi_publisher._version.__version__'
-              )
+          project = data.get('project', {})
+          if 'version' in project:
+            raise SystemExit('[FAIL] project.version must not be hardcoded')
+
+          dynamic = project.get('dynamic', [])
+          if 'version' not in dynamic:
+            raise SystemExit('[FAIL] [project].dynamic must include "version"')
+
+          attr = (
+            data.get('tool', {})
+            .get('setuptools', {})
+            .get('dynamic', {})
+            .get('version', {})
+            .get('attr')
+          )
+          if attr != 'pypi_publisher._version.__version__':
+            raise SystemExit('[FAIL] [tool.setuptools.dynamic].version.attr must point to pypi_publisher._version.__version__')
 
           version_file = root / 'src' / 'pypi_publisher' / '_version.py'
           init_file = root / 'src' / 'pypi_publisher' / '__init__.py'
@@ -90,7 +100,11 @@ jobs:
               raise SystemExit('[FAIL] _version.py must define __version__')
 
           init_text = init_file.read_text(encoding='utf-8')
-          if not re.search(r'^from\s+pypi_publisher\._version\s+import\s+.*__version__', init_text, re.M):
+          patterns = [
+              r'^from\s+pypi_publisher\._version\s+import\s+.*__version__',
+              r'^from\s+\._version\s+import\s+.*__version__',
+          ]
+          if not any(re.search(pattern, init_text, re.M) for pattern in patterns):
               raise SystemExit('[FAIL] __init__.py must import __version__ from _version.py')
 
           if re.search(r'^__version__\s*=\s*"[^"]+"\s*$', init_text, re.M):

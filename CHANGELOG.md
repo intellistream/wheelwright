@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+- Issue #6: CI workflow 补充 `workflow_dispatch`，确保 `main-dev` 可手动触发并作为主开发分支稳定运行。
+- Issue #5: `Version Source Guard` 从脆弱正则改为 `tomllib` 结构化校验，修复历史 guard 误判/失败风险。
+
+### Added
+- 新增 `tests/test_version_source_contract.py`，对动态版本配置与 `_version.py` 单一版本源契约做回归防护。
+
 ### Added
 - CI 新增 `pytest tests/` 单元测试步骤，并对 `detector` / `exceptions` 模块输出覆盖率报告，确保发布工具仓库具备基础 unit test 门禁。
 - 新增 `tests/test_detector.py` 与 `tests/test_exceptions.py`，覆盖构建系统识别与异常上下文行为。
