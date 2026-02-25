@@ -1,0 +1,93 @@
+name: ci
+
+on:
+  push:
+    branches: [main, main-dev]
+  pull_request:
+    branches: [main, main-dev]
+
+jobs:
+  lint-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .[dev]
+
+      - name: Verify main-protection hooks
+        run: |
+          test -f hooks/pre-commit
+          test -f hooks/pre-push
+          test -x hooks/pre-commit
+          test -x hooks/pre-push
+          grep -q "Direct push to main is forbidden" hooks/pre-push
+
+      - name: Ruff check
+        run: ruff check src/
+
+      - name: Ruff format check
+        run: ruff format --check src/
+
+  version-source-guard:
+    name: Version Source Guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate single version source
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import re
+          from pathlib import Path
+
+          root = Path('.')
+          pyproject = root / 'pyproject.toml'
+          content = pyproject.read_text(encoding='utf-8')
+
+          if re.search(r'^version\s*=\s*"', content, re.M):
+              raise SystemExit('[FAIL] project.version must not be hardcoded')
+
+          if not re.search(r'^dynamic\s*=\s*\[\s*"version"\s*\]', content, re.M):
+              raise SystemExit('[FAIL] [project].dynamic must include "version"')
+
+          if not re.search(
+              r'^version\s*=\s*\{\s*attr\s*=\s*"pypi_publisher\._version\.__version__"\s*\}',
+              content,
+              re.M,
+          ):
+              raise SystemExit(
+                  '[FAIL] [tool.setuptools.dynamic].version.attr must point to pypi_publisher._version.__version__'
+              )
+
+          version_file = root / 'src' / 'pypi_publisher' / '_version.py'
+          init_file = root / 'src' / 'pypi_publisher' / '__init__.py'
+
+          if not version_file.exists():
+              raise SystemExit('[FAIL] missing src/pypi_publisher/_version.py')
+
+          version_text = version_file.read_text(encoding='utf-8')
+          if not re.search(r'^__version__\s*=\s*"[^"]+"\s*$', version_text, re.M):
+              raise SystemExit('[FAIL] _version.py must define __version__')
+
+          init_text = init_file.read_text(encoding='utf-8')
+            if not re.search(r'^from\s+pypi_publisher\._version\s+import\s+.*__version__', init_text, re.M):
+              raise SystemExit('[FAIL] __init__.py must import __version__ from _version.py')
+
+          if re.search(r'^__version__\s*=\s*"[^"]+"\s*$', init_text, re.M):
+              raise SystemExit('[FAIL] __init__.py must not hardcode __version__')
+
+          print('[PASS] Version source of truth checks passed.')
+          PY
