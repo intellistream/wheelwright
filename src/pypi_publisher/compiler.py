@@ -351,10 +351,13 @@ class BytecodeCompiler:
 
         if failed_files:
             console.print("  ❌ 编译失败的文件:", style="red")
-            for file_path, error in failed_files[:5]:
-                console.print(f"     - {file_path}: {error[:80]}", style="red")
-            if len(failed_files) > 5:
-                console.print(f"     ... 和其他 {len(failed_files) - 5} 个文件", style="red")
+            for file_path, error in failed_files:
+                console.print(f"     - {file_path}: {error[:120]}", style="red")
+            raise CompilationError(
+                f"字节码编译失败：{len(failed_files)} 个文件编译出错，已中止构建。"
+                " 修复上述文件后重试。",
+                details={"failed_count": len(failed_files), "files": [str(f) for f, _ in failed_files]},
+            )
 
     def _preserve_binary_extensions(self):
         assert self.compiled_path
@@ -382,6 +385,7 @@ class BytecodeCompiler:
         assert self.compiled_path
         python_files = list(self.compiled_path.rglob("*.py"))
         removed = kept = 0
+        orphaned: list[Path] = []
         console.print("  🗑️ 清理源文件...")
         for py_file in python_files:
             if self._should_keep_source(py_file):
@@ -392,7 +396,18 @@ class BytecodeCompiler:
                 py_file.unlink()
                 removed += 1
             else:
-                kept += 1
+                # .pyc missing means compilation was never attempted or silently skipped —
+                # this must not happen after a successful _compile_python_files run.
+                orphaned.append(py_file.relative_to(self.compiled_path))
+        if orphaned:
+            console.print("  ❌ 以下源文件没有对应 .pyc（编译步骤遗漏或失败）:", style="red")
+            for p in orphaned:
+                console.print(f"     - {p}", style="red")
+            raise CompilationError(
+                f"构建中止：{len(orphaned)} 个文件缺少 .pyc，无法安全删除源码。"
+                " 请检查编译步骤是否正确完成。",
+                details={"orphaned_count": len(orphaned), "files": [str(p) for p in orphaned]},
+            )
         console.print(f"  📊 清理统计: 删除 {removed}, 保留 {kept}")
 
     def _should_keep_source(self, py_file: Path) -> bool:
