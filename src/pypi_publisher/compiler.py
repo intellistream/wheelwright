@@ -309,7 +309,7 @@ class BytecodeCompiler:
         finally:
             os.chdir(original_dir)
 
-    def _compile_python_files(self):
+    def _compile_python_files(self) -> None:
         assert self.compiled_path
         python_files = list(self.compiled_path.rglob("*.py"))
         files_to_compile: list[Path] = []
@@ -359,7 +359,7 @@ class BytecodeCompiler:
                 details={"failed_count": len(failed_files), "files": [str(f) for f, _ in failed_files]},
             )
 
-    def _preserve_binary_extensions(self):
+    def _preserve_binary_extensions(self) -> None:
         assert self.compiled_path
         extensions: list[Path] = []
         for ext in ["*.so", "*.pyd", "*.dylib"]:
@@ -381,7 +381,7 @@ class BytecodeCompiler:
             return True
         return False
 
-    def _remove_source_files(self):
+    def _remove_source_files(self) -> None:
         assert self.compiled_path
         python_files = list(self.compiled_path.rglob("*.py"))
         removed = kept = 0
@@ -423,7 +423,7 @@ class BytecodeCompiler:
                     return True
         return False
 
-    def _update_pyproject(self):
+    def _update_pyproject(self) -> None:
         assert self.compiled_path
         pyproject_file = self.compiled_path / "pyproject.toml"
         if not pyproject_file.exists():
@@ -607,7 +607,7 @@ setup(
         else:
             console.print("  ✓ pyproject.toml配置已满足要求", style="dim")
 
-    def _update_pyproject_public(self):
+    def _update_pyproject_public(self) -> None:
         """Update pyproject.toml for public mode (source distribution)."""
         assert self.compiled_path
         pyproject_file = self.compiled_path / "pyproject.toml"
@@ -689,7 +689,7 @@ setup()
         else:
             console.print("  ✓ pyproject.toml配置已满足要求", style="dim")
 
-    def _verify_wheel_contents(self, wheel_file: Path):
+    def _verify_wheel_contents(self, wheel_file: Path) -> None:
         console.print("  🔍 验证wheel包内容...", style="cyan")
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
