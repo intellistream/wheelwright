@@ -391,13 +391,19 @@ class BytecodeCompiler:
             if self._should_keep_source(py_file):
                 kept += 1
                 continue
+            # Files intentionally skipped from compilation (tests, conftest, etc.)
+            # should be removed from the wheel entirely — no .pyc expected.
+            if self._should_skip_file(py_file):
+                py_file.unlink()
+                removed += 1
+                continue
             pyc_file = py_file.with_suffix(".pyc")
             if pyc_file.exists():
                 py_file.unlink()
                 removed += 1
             else:
-                # .pyc missing means compilation was never attempted or silently skipped —
-                # this must not happen after a successful _compile_python_files run.
+                # .pyc missing for a non-skipped file means compilation silently failed —
+                # this is the bug case; fail fast.
                 orphaned.append(py_file.relative_to(self.compiled_path))
         if orphaned:
             console.print("  ❌ 以下源文件没有对应 .pyc（编译步骤遗漏或失败）:", style="red")
