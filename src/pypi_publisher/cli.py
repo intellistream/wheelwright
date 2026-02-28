@@ -602,6 +602,52 @@ def _fetch_pypi_version(package_name: str) -> str | None:
     return None
 
 
+def _resolve_version(package_path: Path) -> str:
+    """Read the package version, supporting both static and dynamic (attr) versioning.
+
+    For static ``[project] version = "x.y.z"`` returns that value.
+    For dynamic ``[tool.setuptools.dynamic.version] attr = "pkg._version.__version__"``
+    locates the corresponding ``_version.py`` file and reads ``__version__`` from it.
+    """
+    pyproject_path = package_path / "pyproject.toml"
+    if not pyproject_path.exists():
+        return "unknown"
+
+    with open(pyproject_path, "rb") as f:
+        data = tomllib.load(f)
+
+    # 1. Static version
+    static = data.get("project", {}).get("version")
+    if static:
+        return static
+
+    # 2. Dynamic version via attr (e.g. "sage.kernel._version.__version__")
+    attr_ref: str = (
+        data.get("tool", {})
+        .get("setuptools", {})
+        .get("dynamic", {})
+        .get("version", {})
+        .get("attr", "")
+    )
+    if attr_ref:
+        # Split into module path and attribute name
+        parts = attr_ref.rsplit(".", 1)
+        if len(parts) == 2:
+            module_dotted, _attr_name = parts
+            # Convert dotted module path to relative file path
+            rel_path = module_dotted.replace(".", "/") + ".py"
+            # Search in common source roots
+            for root in ("src", ""):
+                candidate = package_path / root / rel_path
+                if candidate.exists():
+                    content = candidate.read_text(encoding="utf-8")
+                    m = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', content)
+                    if m:
+                        return m.group(1)
+
+    return "unknown"
+
+
 def _bump_version(package_path: Path, bump_type: str) -> str:
     """Bump version in pyproject.toml.
 
@@ -620,10 +666,9 @@ def _bump_version(package_path: Path, bump_type: str) -> str:
         raise typer.Exit(code=1)
 
     # Read current version
-    with open(pyproject_path, "rb") as f:
-        data = tomllib.load(f)
-
-    current_version_str = data.get("project", {}).get("version", "0.0.0")
+    current_version_str = _resolve_version(package_path)
+    if current_version_str == "unknown":
+        current_version_str = "0.0.0"
 
     # Parse version parts manually to support 4-part versions (major.minor.micro.patch)
     parts = current_version_str.split(".")
@@ -728,11 +773,7 @@ def publish(
         new_version = _bump_version(package_path, auto_bump)
     else:
         console.print("[bold]Step 1/3:[/bold] ⏭️  Skipping version bump (no --auto-bump)...")
-        # Get current version for display
-        pyproject_path = package_path / "pyproject.toml"
-        with open(pyproject_path, "rb") as f:
-            data = tomllib.load(f)
-        new_version = data.get("project", {}).get("version", "unknown")
+        new_version = _resolve_version(package_path)
 
     console.print(f"   Version: [cyan]{new_version}[/cyan]\n")
 
