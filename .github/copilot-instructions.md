@@ -229,3 +229,10 @@ When compiling, automatically update:
 - ✅ 执行 `git commit` 或 `git push` 时，**永远不要**添加 `--no-verify` 标志
 - ✅ 如果 hooks 检查失败，必须先修复问题再提交，而不是绕过 hooks
 - ✅ 帮助开发者设置 hooks 时，推荐运行 `./quickstart.sh`
+
+## Polyrepo coordination (mandatory)
+
+- This repository is an independent SAGE sub-repository and is developed/released independently.
+- Do not assume sibling source directories exist locally in `intellistream/SAGE`.
+- For cross-repo rollout, publish this repo/package first, then bump the version pin in `SAGE/packages/sage/pyproject.toml` when applicable.
+- Do not add local editable installs of other SAGE sub-packages in setup scripts or docs.
