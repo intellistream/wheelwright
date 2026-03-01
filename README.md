@@ -116,72 +116,46 @@ sage-pypi-publisher upload dist/yourpkg-0.1.0-py3-none-any.whl -r pypi --no-dry-
 
 ### Basic Usage
 ```python
-fromPyPI Publishing Options
-
-**Smart Mode (Default) 🎯**
-- **Enabled automatically** - no flags needed!
-- Pure Python → universal wheel + sdist
-- C extensions → current Python wheel + sdist
-- Use `--no-for-pypi` to disable
-
-**Manual Override:**
-- **`--universal`**: Force universal wheel (py3-none-any) - only works for pure Python packages
-- **`--sdist`**: Add source distribution (.tar.gz)
-- **`--no-for-pypi`**: Disable smart mode, build for current Python only
-
-**Why NOT build wheels for each Python version?**
-
-You might wonder: "Why not build cp38, cp39, cp310, cp311, cp312 wheels separately?"
-
-**Technical limitation**: To build a wheel for Python 3.10, you need Python 3.10 installed and running. You can't build a true Python 3.10 wheel from Python 3.11 environment.
-
-**Better solution**: 
-- Pure Python packages → Use universal wheel (py3-none-any) - ONE wheel for ALL versions!
-- C extensions → Provide source distribution (sdist) so users can compile for their Python version
-- For production C extensions with multiple versions → Use `cibuildwheel` in CI/CD
-wheeUniversal Wheel (Recommended for Pure Python)
-```python
 from pathlib import Path
 from pypi_publisher.compiler import BytecodeCompiler
 
-# For pure Python packages
-compiler = BytecodeCompiler(Path("/path/to/pkg"), mode="public")
+# Create compiler
+compiler = BytecodeCompiler(Path("/path/to/pkg"), mode="private")
 compiled = compiler.compile_package()
 
-# Build universal wheel (works on ALL Python 3.x)
-universal_wheel = compiler.build_universal_wheel(compiled)
+# Build wheel
+wheel = compiler.build_wheel(compiled)
 
-# Build source distribution
-sdist = compiler.build_sdist(compiled)
-
-# Upload both
-for artifact in [universal_wheel, sdist]:
-    compiler.upload_wheel(artiface_package()
-
-# Build source distribution
-sdist = compiler.build_sdist(compiled)
-compiler.upload_wheel(sdist, repository="pypi", dry_run=False)
+# Upload to TestPyPI (safe default)
+compiler.upload_wheel(wheel, repository="testpypi", dry_run=True)
 ```
+
+### PyPI Publishing Options
+
+- **Smart Mode (default)**: Automatically chooses packaging strategy for PyPI.
+- **`--no-for-pypi`**: Disable smart mode and use current-interpreter build behavior.
+- **`--universal`**: Force `py3-none-any` wheel (pure Python only).
+- **`--sdist`**: Also build source distribution (`.tar.gz`).
+
+For C/C++ extension packages targeting multiple Python versions, use `cibuildwheel` in CI.
 
 ## Git Hooks
 
 sage-pypi-publisher provides intelligent git hooks to simplify version management and PyPI publishing.
 
-### Installation
+### Hook Installation
 
 ```bash
 sage-pypi-publisher install-hooks .
 ```
 
-### Features
+### Hook Features
 
-- **Auto-detection**: Detects version changes in `pyproject.toml` on push.
-- **Interactive Update**: Prompts to update version if forgotten.
-- **Auto-Publish**: Builds and uploads to PyPI automatically upon confirmation.
-- **Smart Build**: Detects C/C++ extensions for manylinux wheels.
+- **Version Guard**: Detects if the current version is already published on PyPI.
+- **Auto-bump on Conflict**: Can auto-bump patch version when a duplicate release is detected.
+- **Interactive Flow**: Keeps release behavior explicit and visible during push.
 
 ## Notes
 - Requires `python -m build` and `twine` available.
 - No backward compatibility with `sage-dev` CLI; PyPI commands have been removed from SAGE.
 - Designed to be monorepo-friendly but works with any package path that contains `pyproject.toml`.
-# Test commit
