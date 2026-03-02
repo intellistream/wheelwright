@@ -356,7 +356,10 @@ class BytecodeCompiler:
             raise CompilationError(
                 f"字节码编译失败：{len(failed_files)} 个文件编译出错，已中止构建。"
                 " 修复上述文件后重试。",
-                details={"failed_count": len(failed_files), "files": [str(f) for f, _ in failed_files]},
+                details={
+                    "failed_count": len(failed_files),
+                    "files": [str(f) for f, _ in failed_files],
+                },
             )
 
     def _preserve_binary_extensions(self) -> None:
