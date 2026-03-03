@@ -229,3 +229,17 @@ When compiling, automatically update:
 - ✅ 执行 `git commit` 或 `git push` 时，**永远不要**添加 `--no-verify` 标志
 - ✅ 如果 hooks 检查失败，必须先修复问题再提交，而不是绕过 hooks
 - ✅ 帮助开发者设置 hooks 时，推荐运行 `./quickstart.sh`
+
+## Polyrepo coordination (mandatory)
+
+- This repository is an independent SAGE sub-repository and is developed/released independently.
+- Do not assume sibling source directories exist locally in `intellistream/SAGE`.
+- For cross-repo rollout, publish this repo/package first, then bump the version pin in `SAGE/packages/sage/pyproject.toml` when applicable.
+- Do not add local editable installs of other SAGE sub-packages in setup scripts or docs.
+
+## 🚫 NEVER_CREATE_DOT_VENV_MANDATORY
+
+- 永远不要创建 `.venv` 或 `venv`（无任何例外）。
+- NEVER create `.venv`/`venv` in this repository under any circumstance.
+- 必须复用当前已配置的非-venv Python 环境（如现有 conda 环境）。
+- If any script/task suggests creating a virtualenv, skip that step and continue with the existing environment.

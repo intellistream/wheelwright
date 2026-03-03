@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import zipfile
 from collections.abc import Iterable
 from pathlib import Path
@@ -170,12 +171,37 @@ class BytecodeCompiler:
             cmd.extend(["--repository", "testpypi"])
         cmd.extend(wheel_files)
 
-        try:
-            upload_result = subprocess.run(cmd, capture_output=True, text=True)
-        except FileNotFoundError as exc:
-            raise UploadError(
-                "未找到 twine，请先安装 (pip install twine)", repository=repo_name
-            ) from exc
+        _max_retries = 3
+        _retry_delay = 8  # seconds
+        _transient_pattern = re.compile(
+            r"ConnectionError|TimeoutError|connectionpool|RemoteDisconnected"
+            r"|ECONNRESET|urlopen error|Connection reset|ChunkedEncodingError"
+            r"|ConnectionRefusedError|BrokenPipeError",
+            re.IGNORECASE,
+        )
+
+        upload_result = None
+        for _attempt in range(1, _max_retries + 1):
+            try:
+                upload_result = subprocess.run(cmd, capture_output=True, text=True)
+            except FileNotFoundError as exc:
+                raise UploadError(
+                    "未找到 twine，请先安装 (pip install twine)", repository=repo_name
+                ) from exc
+
+            if upload_result.returncode == 0:
+                break  # success
+
+            error_output = (upload_result.stderr or "") + (upload_result.stdout or "")
+            if _attempt < _max_retries and _transient_pattern.search(error_output):
+                console.print(
+                    f"  ⚠️  上传遇到网络错误，{_retry_delay}秒后重试"
+                    f" ({_attempt}/{_max_retries - 1})...",
+                    style="yellow",
+                )
+                time.sleep(_retry_delay)
+                continue
+            break  # non-transient error or last attempt
 
         if upload_result.returncode == 0:
             # 解析输出，区分真正上传和跳过
@@ -227,7 +253,7 @@ class BytecodeCompiler:
             return True
 
         error_msg = upload_result.stderr.strip() if upload_result.stderr else "未知错误"
-        raise UploadError(error_msg[:200], repository=repo_name)
+        raise UploadError(error_msg[:1000], repository=repo_name)
 
     def build_universal_wheel(self, compiled_path: Path | None = None) -> Path:
         """Build a universal pure Python wheel (py3-none-any).
@@ -309,7 +335,7 @@ class BytecodeCompiler:
         finally:
             os.chdir(original_dir)
 
-    def _compile_python_files(self):
+    def _compile_python_files(self) -> None:
         assert self.compiled_path
         python_files = list(self.compiled_path.rglob("*.py"))
         files_to_compile: list[Path] = []
@@ -351,12 +377,18 @@ class BytecodeCompiler:
 
         if failed_files:
             console.print("  ❌ 编译失败的文件:", style="red")
-            for file_path, error in failed_files[:5]:
-                console.print(f"     - {file_path}: {error[:80]}", style="red")
-            if len(failed_files) > 5:
-                console.print(f"     ... 和其他 {len(failed_files) - 5} 个文件", style="red")
+            for file_path, error in failed_files:
+                console.print(f"     - {file_path}: {error[:120]}", style="red")
+            raise CompilationError(
+                f"字节码编译失败：{len(failed_files)} 个文件编译出错，已中止构建。"
+                " 修复上述文件后重试。",
+                details={
+                    "failed_count": len(failed_files),
+                    "files": [str(f) for f, _ in failed_files],
+                },
+            )
 
-    def _preserve_binary_extensions(self):
+    def _preserve_binary_extensions(self) -> None:
         assert self.compiled_path
         extensions: list[Path] = []
         for ext in ["*.so", "*.pyd", "*.dylib"]:
@@ -378,21 +410,39 @@ class BytecodeCompiler:
             return True
         return False
 
-    def _remove_source_files(self):
+    def _remove_source_files(self) -> None:
         assert self.compiled_path
         python_files = list(self.compiled_path.rglob("*.py"))
         removed = kept = 0
+        orphaned: list[Path] = []
         console.print("  🗑️ 清理源文件...")
         for py_file in python_files:
             if self._should_keep_source(py_file):
                 kept += 1
+                continue
+            # Files intentionally skipped from compilation (tests, conftest, etc.)
+            # should be removed from the wheel entirely — no .pyc expected.
+            if self._should_skip_file(py_file):
+                py_file.unlink()
+                removed += 1
                 continue
             pyc_file = py_file.with_suffix(".pyc")
             if pyc_file.exists():
                 py_file.unlink()
                 removed += 1
             else:
-                kept += 1
+                # .pyc missing for a non-skipped file means compilation silently failed —
+                # this is the bug case; fail fast.
+                orphaned.append(py_file.relative_to(self.compiled_path))
+        if orphaned:
+            console.print("  ❌ 以下源文件没有对应 .pyc（编译步骤遗漏或失败）:", style="red")
+            for p in orphaned:
+                console.print(f"     - {p}", style="red")
+            raise CompilationError(
+                f"构建中止：{len(orphaned)} 个文件缺少 .pyc，无法安全删除源码。"
+                " 请检查编译步骤是否正确完成。",
+                details={"orphaned_count": len(orphaned), "files": [str(p) for p in orphaned]},
+            )
         console.print(f"  📊 清理统计: 删除 {removed}, 保留 {kept}")
 
     def _should_keep_source(self, py_file: Path) -> bool:
@@ -408,7 +458,7 @@ class BytecodeCompiler:
                     return True
         return False
 
-    def _update_pyproject(self):
+    def _update_pyproject(self) -> None:
         assert self.compiled_path
         pyproject_file = self.compiled_path / "pyproject.toml"
         if not pyproject_file.exists():
@@ -592,7 +642,7 @@ setup(
         else:
             console.print("  ✓ pyproject.toml配置已满足要求", style="dim")
 
-    def _update_pyproject_public(self):
+    def _update_pyproject_public(self) -> None:
         """Update pyproject.toml for public mode (source distribution)."""
         assert self.compiled_path
         pyproject_file = self.compiled_path / "pyproject.toml"
@@ -674,7 +724,7 @@ setup()
         else:
             console.print("  ✓ pyproject.toml配置已满足要求", style="dim")
 
-    def _verify_wheel_contents(self, wheel_file: Path):
+    def _verify_wheel_contents(self, wheel_file: Path) -> None:
         console.print("  🔍 验证wheel包内容...", style="cyan")
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
