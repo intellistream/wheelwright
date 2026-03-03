@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import zipfile
 from collections.abc import Iterable
 from pathlib import Path
@@ -170,12 +171,37 @@ class BytecodeCompiler:
             cmd.extend(["--repository", "testpypi"])
         cmd.extend(wheel_files)
 
-        try:
-            upload_result = subprocess.run(cmd, capture_output=True, text=True)
-        except FileNotFoundError as exc:
-            raise UploadError(
-                "未找到 twine，请先安装 (pip install twine)", repository=repo_name
-            ) from exc
+        _max_retries = 3
+        _retry_delay = 8  # seconds
+        _transient_pattern = re.compile(
+            r"ConnectionError|TimeoutError|connectionpool|RemoteDisconnected"
+            r"|ECONNRESET|urlopen error|Connection reset|ChunkedEncodingError"
+            r"|ConnectionRefusedError|BrokenPipeError",
+            re.IGNORECASE,
+        )
+
+        upload_result = None
+        for _attempt in range(1, _max_retries + 1):
+            try:
+                upload_result = subprocess.run(cmd, capture_output=True, text=True)
+            except FileNotFoundError as exc:
+                raise UploadError(
+                    "未找到 twine，请先安装 (pip install twine)", repository=repo_name
+                ) from exc
+
+            if upload_result.returncode == 0:
+                break  # success
+
+            error_output = (upload_result.stderr or "") + (upload_result.stdout or "")
+            if _attempt < _max_retries and _transient_pattern.search(error_output):
+                console.print(
+                    f"  ⚠️  上传遇到网络错误，{_retry_delay}秒后重试"
+                    f" ({_attempt}/{_max_retries - 1})...",
+                    style="yellow",
+                )
+                time.sleep(_retry_delay)
+                continue
+            break  # non-transient error or last attempt
 
         if upload_result.returncode == 0:
             # 解析输出，区分真正上传和跳过
@@ -227,7 +253,7 @@ class BytecodeCompiler:
             return True
 
         error_msg = upload_result.stderr.strip() if upload_result.stderr else "未知错误"
-        raise UploadError(error_msg[:200], repository=repo_name)
+        raise UploadError(error_msg[:1000], repository=repo_name)
 
     def build_universal_wheel(self, compiled_path: Path | None = None) -> Path:
         """Build a universal pure Python wheel (py3-none-any).
