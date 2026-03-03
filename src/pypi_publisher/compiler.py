@@ -11,6 +11,7 @@ import os
 import py_compile
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -45,6 +46,7 @@ class BytecodeCompiler:
         self.temp_dir = temp_dir
         self.compiled_path: Path | None = None
         self._binary_extensions: list[Path] = []
+        self._ignored_copy_entries: list[str] = []
         # Glob patterns (relative to package root) whose .py files are preserved
         # even in private mode, e.g. ["src/mypkg/kernels/fused_ops.py"]
         self.keep_source_patterns: list[str] = keep_source_patterns or []
@@ -86,7 +88,18 @@ class BytecodeCompiler:
         if self.compiled_path.exists():
             console.print(f"  🧹 清理已存在的目录: {self.compiled_path}")
             shutil.rmtree(self.compiled_path)
-        shutil.copytree(self.package_path, self.compiled_path, symlinks=True)
+        self._ignored_copy_entries = []
+        shutil.copytree(
+            self.package_path,
+            self.compiled_path,
+            symlinks=True,
+            ignore=self._copytree_ignore,
+        )
+        if self._ignored_copy_entries:
+            console.print(
+                f"  🧹 复制阶段已忽略 {len(self._ignored_copy_entries)} 个构建无关/特殊文件",
+                style="yellow",
+            )
 
         if self.mode == "private":
             # Private mode: compile to bytecode
@@ -101,6 +114,67 @@ class BytecodeCompiler:
             console.print(f"✅ 包准备完成 (公开模式): {self.package_path.name}", style="green")
 
         return self.compiled_path
+
+    def _copytree_ignore(self, src: str, names: list[str]) -> set[str]:
+        """Return names to ignore while copying project tree for build."""
+        ignored: set[str] = set()
+        src_path = Path(src)
+
+        ignored_dir_names = {
+            ".git",
+            ".hg",
+            ".svn",
+            ".sage",
+            ".mypy_cache",
+            ".pytest_cache",
+            ".ruff_cache",
+            ".tox",
+            ".nox",
+            "__pycache__",
+            "build",
+            "dist",
+        }
+        ignored_file_names = {".DS_Store"}
+
+        for name in names:
+            candidate = src_path / name
+
+            if name in ignored_dir_names and candidate.is_dir():
+                ignored.add(name)
+                self._record_ignored_copy_entry(candidate)
+                continue
+            if name in ignored_file_names:
+                ignored.add(name)
+                self._record_ignored_copy_entry(candidate)
+                continue
+
+            # Skip special filesystem nodes (socket, fifo, device files)
+            # which are runtime artifacts and cannot/should not be packaged.
+            try:
+                st_mode = os.lstat(candidate).st_mode
+            except OSError:
+                ignored.add(name)
+                self._record_ignored_copy_entry(candidate)
+                continue
+
+            if (
+                stat.S_ISSOCK(st_mode)
+                or stat.S_ISFIFO(st_mode)
+                or stat.S_ISCHR(st_mode)
+                or stat.S_ISBLK(st_mode)
+            ):
+                ignored.add(name)
+                self._record_ignored_copy_entry(candidate)
+
+        return ignored
+
+    def _record_ignored_copy_entry(self, path: Path) -> None:
+        """Record ignored entries with package-relative path for diagnostics."""
+        try:
+            rel = path.relative_to(self.package_path)
+            self._ignored_copy_entries.append(str(rel))
+        except ValueError:
+            self._ignored_copy_entries.append(str(path))
 
     def build_wheel(self, compiled_path: Path | None = None, python_tag: str | None = None) -> Path:
         """Build wheel from compiled path with optional specific Python tag."""
