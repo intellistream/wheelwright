@@ -1,6 +1,6 @@
-# sage-pypi-publisher
+# wheelwright
 
-A tiny toolkit to compile Python packages to bytecode, build wheels, and publish to PyPI/TestPyPI. Extracted from SAGE's internal `sage-dev` tooling and made standalone.
+Wheelwright is a Python packaging workflow tool that compiles packages to bytecode, builds wheels, and publishes to PyPI/TestPyPI.
 
 ## Features
 - Copy a package tree and compile `.py` → `.pyc` (keeps `__init__.py` and `_version.py`).
@@ -16,11 +16,11 @@ A tiny toolkit to compile Python packages to bytecode, build wheels, and publish
 
 **Problem:** Your package declares support for Python 3.8-3.12, but you only upload a wheel for Python 3.11. Users on other versions can't install it!
 
-**Solution:** sage-pypi-publisher now uses **Smart Mode by default** 🎯
+**Solution:** wheelwright now uses **Smart Mode by default** 🎯
 
 ```bash
 # That's it! No extra flags needed - smart mode is automatic
-sage-pypi-publisher build . --upload --no-dry-run
+wheelwright build . --upload --no-dry-run
 ```
 
 **What happens automatically:**
@@ -38,7 +38,7 @@ sage-pypi-publisher build . --upload --no-dry-run
 ```bash
 pip install .
 # or
-pip install sage-pypi-publisher
+pip install wheelwright
 ```
 
 ## CLI
@@ -48,13 +48,13 @@ pip install sage-pypi-publisher
 **🎯 Simplest Usage (Smart Mode - Default!)**
 ```bash
 # Just build - automatically chooses best strategy!
-sage-pypi-publisher build .
+wheelwright build .
 
 # Build and upload to TestPyPI
-sage-pypi-publisher build . --upload -r testpypi
+wheelwright build . --upload -r testpypi
 
 # Build and upload to PyPI (production)
-sage-pypi-publisher build . --upload --no-dry-run -r pypi
+wheelwright build . --upload --no-dry-run -r pypi
 ```
 
 **What Smart Mode Does (Automatically):**
@@ -67,43 +67,43 @@ sage-pypi-publisher build . --upload --no-dry-run -r pypi
 **Manual Control (Advanced):**
 ```bash
 # Disable smart mode (old behavior - current Python only)
-sage-pypi-publisher build . --no-for-pypi
+wheelwright build . --no-for-pypi
 
 # Force universal wheel
-sage-pypi-publisher build . --universal
+wheelwright build . --universal
 
 # Force specific mode
-sage-pypi-publisher build . --mode public
+wheelwright build . --mode public
 ```
 
 ### All Commands
 
 ```bash
-sage-pypi-publisher --help
+wheelwright --help
 
 # 🎯 Simplest: Build with smart mode (default!)
-sage-pypi-publisher build .
+wheelwright build .
 
 # Build and upload to PyPI
-sage-pypi-publisher build . --upload --no-dry-run
+wheelwright build . --upload --no-dry-run
 
 # Compile only (bytecode mode by default)
-sage-pypi-publisher compile /path/to/pkg -o /tmp/out
+wheelwright compile /path/to/pkg -o /tmp/out
 
 # Compile in public mode (keep source)
-sage-pypi-publisher compile /path/to/pkg -o /tmp/out --mode public
+wheelwright compile /path/to/pkg -o /tmp/out --mode public
 
 # Disable smart mode (old behavior)
-sage-pypi-publisher build /path/to/pkg --no-for-pypi
+wheelwright build /path/to/pkg --no-for-pypi
 
 # Force universal wheel (manual override)
-sage-pypi-publisher build /path/to/pkg --universal
+wheelwright build /path/to/pkg --universal
 
 # Force manylinux build for C/C++ extensions
-sage-pypi-publisher build /path/to/pkg --force-manylinux
+wheelwright build /path/to/pkg --force-manylinux
 
 # Upload an existing wheel
-sage-pypi-publisher upload dist/yourpkg-0.1.0-py3-none-any.whl -r pypi --no-dry-run
+wheelwright upload dist/yourpkg-0.1.0-py3-none-any.whl -r pypi --no-dry-run
 ```
 
 ### Build Modes
@@ -117,7 +117,7 @@ sage-pypi-publisher upload dist/yourpkg-0.1.0-py3-none-any.whl -r pypi --no-dry-
 ### Basic Usage
 ```python
 from pathlib import Path
-from pypi_publisher.compiler import BytecodeCompiler
+from wheelwright.compiler import BytecodeCompiler
 
 # Create compiler
 compiler = BytecodeCompiler(Path("/path/to/pkg"), mode="private")
@@ -141,12 +141,12 @@ For C/C++ extension packages targeting multiple Python versions, use `cibuildwhe
 
 ## Git Hooks
 
-sage-pypi-publisher provides intelligent git hooks to simplify version management and PyPI publishing.
+wheelwright provides intelligent git hooks to simplify version management and PyPI publishing.
 
 ### Hook Installation
 
 ```bash
-sage-pypi-publisher install-hooks .
+wheelwright install-hooks .
 ```
 
 ### Hook Features

@@ -39,8 +39,8 @@ jobs:
       - name: Run unit tests
         run: |
           pytest tests/ -v \
-            --cov=pypi_publisher.exceptions \
-            --cov=pypi_publisher.detector \
+            --cov=wheelwright.exceptions \
+            --cov=wheelwright.detector \
             --cov-report=term
 
   version-source-guard:
@@ -86,14 +86,14 @@ jobs:
             .get('version', {})
             .get('attr')
           )
-          if attr != 'pypi_publisher._version.__version__':
-            raise SystemExit('[FAIL] [tool.setuptools.dynamic].version.attr must point to pypi_publisher._version.__version__')
+          if attr != 'wheelwright._version.__version__':
+            raise SystemExit('[FAIL] [tool.setuptools.dynamic].version.attr must point to wheelwright._version.__version__')
 
-          version_file = root / 'src' / 'pypi_publisher' / '_version.py'
-          init_file = root / 'src' / 'pypi_publisher' / '__init__.py'
+          version_file = root / 'src' / 'wheelwright' / '_version.py'
+          init_file = root / 'src' / 'wheelwright' / '__init__.py'
 
           if not version_file.exists():
-              raise SystemExit('[FAIL] missing src/pypi_publisher/_version.py')
+              raise SystemExit('[FAIL] missing src/wheelwright/_version.py')
 
           version_text = version_file.read_text(encoding='utf-8')
           if not re.search(r'^__version__\s*=\s*"[^"]+"\s*$', version_text, re.M):
@@ -101,7 +101,7 @@ jobs:
 
           init_text = init_file.read_text(encoding='utf-8')
           patterns = [
-              r'^from\s+pypi_publisher\._version\s+import\s+.*__version__',
+              r'^from\s+wheelwright\._version\s+import\s+.*__version__',
               r'^from\s+\._version\s+import\s+.*__version__',
           ]
           if not any(re.search(pattern, init_text, re.M) for pattern in patterns):

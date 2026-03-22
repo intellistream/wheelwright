@@ -1,7 +1,7 @@
-# GitHub Copilot Instructions for sage-pypi-publisher
+# GitHub Copilot Instructions for wheelwright
 
 ## Project Overview
-`sage-pypi-publisher` is a Python bytecode compiler and PyPI publishing toolkit designed for monorepo projects. It compiles Python packages to bytecode (`.py` → `.pyc`), builds wheels, and publishes to PyPI/TestPyPI.
+`wheelwright` is a Python bytecode compiler and PyPI publishing toolkit designed for monorepo projects. It compiles Python packages to bytecode (`.py` → `.pyc`), builds wheels, and publishes to PyPI/TestPyPI.
 
 **Key Features:**
 - Compile Python packages to bytecode while preserving `__init__.py` and `_version.py`
@@ -21,9 +21,9 @@
 
 ## Project Structure
 ```
-sage-pypi-publisher/
+wheelwright/
 ├── src/
-│   └── pypi_publisher/
+│   └── wheelwright/
 │       ├── __init__.py       # Package exports
 │       ├── _version.py       # Version info
 │       ├── cli.py            # Typer CLI commands
@@ -196,14 +196,14 @@ When compiling, automatically update:
 - Error messages: Chinese with technical details in English
 
 ## Related Projects
-- Extracted from SAGE's internal `sage-dev` tooling
+- Extracted into a standalone repository from IntelliStream's internal tooling
 - Designed for IntelliStream Team's monorepo workflow
 - MIT licensed, open source
 
 ## Repository Information
 - **Owner**: intellistream
-- **Repository**: sage-pypi-publisher
-- **Homepage**: https://github.com/intellistream/pypi-publisher
+- **Repository**: wheelwright
+- **Homepage**: https://github.com/intellistream/wheelwright
 - **Contact**: shuhao_zhang@hust.edu.cn
 
 

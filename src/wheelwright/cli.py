@@ -1,4 +1,4 @@
-"""Command line interface for sage-pypi-publisher."""
+"""Command line interface for wheelwright."""
 
 from __future__ import annotations
 
@@ -9,50 +9,24 @@ import requests
 import typer
 from rich.console import Console
 
-from pypi_publisher._version import __version__
-from pypi_publisher.compiler import BytecodeCompiler
-from pypi_publisher.detector import detect_build_system
-from pypi_publisher.manylinux_builder import ManylinuxBuilder
+from wheelwright._version import __version__
+from wheelwright.compiler import BytecodeCompiler
+from wheelwright.detector import detect_build_system
+from wheelwright.manylinux_builder import ManylinuxBuilder
 
 try:
     import tomllib
 except ImportError:
     import tomli as tomllib  # type: ignore
 
-# Known SAGE packages to always include in version checks
-KNOWN_SAGE_PACKAGES = [
-    "isage-pypi-publisher",
-    "isage-kernel",
-    "isage-middleware",
-    "isage-neuromem",
-    "isage",
-    "isage-llm-gateway",
-    "isage-libs",
-    "isage-llm-core",
-    "isage-common",
-    "isage-data",
-    "isage-vdb",
-    "isage-tsdb",
-    "isage-refiner",
-    "isage-flow",
-    "isage-benchmark",
-    "sage-github-manager",
-    "isage-edge",
-    "isage-tools",
-    "isage-studio",
-    "isage-apps",
-    "isage-cli",
-    "isage-platform",
-    "intellistream",
-    "pysame",
-]
+KNOWN_PACKAGES: list[str] = []
 
 console = Console()
-app = typer.Typer(name="sage-pypi-publisher", add_completion=False, no_args_is_help=True)
+app = typer.Typer(name="wheelwright", add_completion=False, no_args_is_help=True)
 
 
 def _load_keep_source_patterns(package_path: Path) -> list[str]:
-    """Read [tool.sage-pypi-publisher] keep_source list from pyproject.toml.
+    """Read [tool.wheelwright] keep_source list from pyproject.toml.
 
     Allows packages to specify which .py files must be kept as source
     (not compiled to .pyc) in private-mode builds, e.g. for Triton kernels
@@ -60,7 +34,7 @@ def _load_keep_source_patterns(package_path: Path) -> list[str]:
 
     Example in pyproject.toml::
 
-        [tool.sage-pypi-publisher]
+        [tool.wheelwright]
         keep_source = [
             "src/mypkg/kernels/fused_ops.py",
         ]
@@ -70,7 +44,7 @@ def _load_keep_source_patterns(package_path: Path) -> list[str]:
         return []
     try:
         data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
-        return data.get("tool", {}).get("sage-pypi-publisher", {}).get("keep_source", [])
+        return data.get("tool", {}).get("wheelwright", {}).get("keep_source", [])
     except Exception:  # noqa: BLE001
         return []
 
@@ -161,13 +135,13 @@ def build(
     **Simplest Usage (Recommended):**
     ```bash
     # Just build - smart mode is automatic!
-    sage-pypi-publisher build .
+    wheelwright build .
 
     # Build and upload to PyPI
-    sage-pypi-publisher build . --upload --no-dry-run
+    wheelwright build . --upload --no-dry-run
 
     # Test on TestPyPI first
-    sage-pypi-publisher build . --upload -r testpypi
+    wheelwright build . --upload -r testpypi
     ```
 
     **Why this solves the multi-version problem:**
@@ -183,16 +157,16 @@ def build(
 
     Examples:
         # Default: Smart mode (automatically chooses best strategy)
-        sage-pypi-publisher build .
+        wheelwright build .
 
         # Upload to TestPyPI (smart mode still active)
-        sage-pypi-publisher build . --upload -r testpypi
+        wheelwright build . --upload -r testpypi
 
         # Real PyPI upload
-        sage-pypi-publisher build . --upload --no-dry-run -r pypi
+        wheelwright build . --upload --no-dry-run -r pypi
 
         # Disable smart mode (old behavior)
-        sage-pypi-publisher build . --no-for-pypi
+        wheelwright build . --no-for-pypi
     """
     # Handle version auto-bump if requested
     if auto_bump:
@@ -322,7 +296,7 @@ def build(
             else:
                 console.print("\n💡 跳过上传。如需上传，可以运行:")
                 console.print(
-                    f"   [cyan]sage-pypi-publisher upload <artifact> -r {repository} --no-dry-run[/cyan]"
+                    f"   [cyan]wheelwright upload <artifact> -r {repository} --no-dry-run[/cyan]"
                 )
 
 
@@ -350,13 +324,13 @@ def build_manylinux(
 
     Examples:
         # Build a manylinux wheel
-        sage-pypi-publisher build-manylinux .
+        wheelwright build-manylinux .
 
         # Build and upload (real upload)
-        sage-pypi-publisher build-manylinux . --upload --no-dry-run
+        wheelwright build-manylinux . --upload --no-dry-run
 
         # Use a specific platform tag
-        sage-pypi-publisher build-manylinux . --platform manylinux_2_28_x86_64
+        wheelwright build-manylinux . --platform manylinux_2_28_x86_64
     """
     builder = ManylinuxBuilder(package_path)
     wheel_path = builder.build_manylinux_wheel(
@@ -369,7 +343,7 @@ def build_manylinux(
     # Handle upload: auto-upload or prompt user
     if upload:
         console.print(f"\n🚀 准备上传到 {repository.upper()}...")
-        from pypi_publisher.compiler import BytecodeCompiler
+        from wheelwright.compiler import BytecodeCompiler
 
         compiler = BytecodeCompiler(package_path)
         compiler.upload_wheel(wheel_path, repository=repository, dry_run=dry_run)
@@ -388,14 +362,14 @@ def build_manylinux(
                     dry_run = False
 
             console.print(f"\n🚀 准备上传到 {repository.upper()}...")
-            from pypi_publisher.compiler import BytecodeCompiler
+            from wheelwright.compiler import BytecodeCompiler
 
             compiler = BytecodeCompiler(package_path)
             compiler.upload_wheel(wheel_path, repository=repository, dry_run=dry_run)
         else:
             console.print("\n💡 跳过上传。如需上传，可以运行:")
             console.print(
-                f"   [cyan]sage-pypi-publisher upload {wheel_path} -r {repository} --no-dry-run[/cyan]"
+                f"   [cyan]wheelwright upload {wheel_path} -r {repository} --no-dry-run[/cyan]"
             )
 
 
@@ -414,7 +388,7 @@ def upload(
 
 def print_version(value: bool):
     if value:
-        console.print(f"sage-pypi-publisher {__version__}")
+        console.print(f"wheelwright {__version__}")
         raise typer.Exit()
 
 
@@ -431,8 +405,8 @@ def main_callback(
 def install_hooks(
     package_path: Path = typer.Argument(".", help="Path to the package directory"),
 ):
-    """Install sage-pypi-publisher git hooks (pre-commit, pre-push) into your repository."""
-    from pypi_publisher.hooks import install_git_hooks
+    """Install wheelwright git hooks (pre-commit, pre-push) into your repository."""
+    from wheelwright.hooks import install_git_hooks
 
     console.print("[bold]Installing git hooks...[/bold]")
     success = install_git_hooks(package_path)
@@ -448,8 +422,8 @@ def install_hooks(
 def uninstall_hooks(
     package_path: Path = typer.Argument(".", help="Path to the package directory"),
 ):
-    """Uninstall sage-pypi-publisher git hooks."""
-    from pypi_publisher.hooks import uninstall_git_hooks
+    """Uninstall wheelwright git hooks."""
+    from wheelwright.hooks import uninstall_git_hooks
 
     console.print("[bold]Uninstalling git hooks...[/bold]")
     uninstall_git_hooks(package_path)
@@ -519,8 +493,8 @@ def list_versions(
         # User specified packages explicitly
         target_packages = set(packages)
     else:
-        # Default: Local packages + Known SAGE packages
-        target_packages = set(local_packages.keys()) | set(KNOWN_SAGE_PACKAGES)
+        # Default: Local packages + any optional configured package hints
+        target_packages = set(local_packages.keys()) | set(KNOWN_PACKAGES)
 
     if not target_packages:
         console.print("[red]No packages found or specified.[/red]")
@@ -754,16 +728,16 @@ def publish(
 
     Examples:
         # Bump patch version and publish to PyPI (dry-run)
-        sage-pypi-publisher publish . --auto-bump patch
+        wheelwright publish . --auto-bump patch
 
         # Real publish to PyPI
-        sage-pypi-publisher publish . --auto-bump patch --no-dry-run
+        wheelwright publish . --auto-bump patch --no-dry-run
 
         # Publish to TestPyPI for testing
-        sage-pypi-publisher publish . --auto-bump minor -r testpypi --no-dry-run
+        wheelwright publish . --auto-bump minor -r testpypi --no-dry-run
 
         # Public source release (no bytecode compilation)
-        sage-pypi-publisher publish . --auto-bump patch --mode public --no-dry-run
+        wheelwright publish . --auto-bump patch --mode public --no-dry-run
     """
     console.print("[bold cyan]🚀 Starting publish workflow...[/bold cyan]\n")
 
@@ -823,7 +797,7 @@ def publish(
         console.print(f"\n[dim]要真正发布到 {repository.upper()}，请运行:[/dim]")
         bump_flag = f" --auto-bump {auto_bump}" if auto_bump else ""
         console.print(
-            f"  [cyan]sage-pypi-publisher publish {package_path}{bump_flag} -r {repository} --no-dry-run[/cyan]"
+            f"  [cyan]wheelwright publish {package_path}{bump_flag} -r {repository} --no-dry-run[/cyan]"
         )
     else:
         console.print("[bold green]🎉 发布成功！[/bold green]")

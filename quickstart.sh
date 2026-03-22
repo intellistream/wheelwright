@@ -1,6 +1,6 @@
 #!/bin/bash
-# SageVDB Quickstart Script
-# Sets up development environment and git hooks
+# wheelwright Quickstart Script
+# Sets up development checks and git hooks
 
 set -e
 
@@ -21,7 +21,7 @@ echo -e "${BOLD}${BLUE} _\\ \/ _ \/ _ \/ -_)   / /    / / / / / __  |${NC}"
 echo -e "${BOLD}${BLUE}/___/\\___/\\_, /\\__/   /_/    /_/ /_/ /____/ ${NC}"
 echo -e "${BOLD}${BLUE}         /___/                               ${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}${BOLD}SageVDB Quickstart Setup${NC}"
+echo -e "${GREEN}${BOLD}wheelwright Quickstart Setup${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
@@ -104,12 +104,12 @@ else
     echo -e "${RED}✗ Python not found${NC}"
 fi
 
-# Check for sage-pypi-publisher
-if command -v sage-pypi-publisher &> /dev/null; then
-    echo -e "${GREEN}✓ sage-pypi-publisher found${NC}"
+# Check for wheelwright
+if command -v wheelwright &> /dev/null; then
+    echo -e "${GREEN}✓ wheelwright found${NC}"
 else
-    echo -e "${YELLOW}⚠  sage-pypi-publisher not found${NC}"
-    echo -e "${YELLOW}  Optional for PyPI publishing: pip install sage-pypi-publisher${NC}"
+    echo -e "${YELLOW}⚠  wheelwright not found${NC}"
+    echo -e "${YELLOW}  Optional for PyPI publishing: pip install wheelwright${NC}"
 fi
 
 echo ""
@@ -128,7 +128,7 @@ read -r BUILD_NOW
 if [[ "$BUILD_NOW" =~ ^[Yy]$ ]]; then
     echo ""
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${GREEN}🔨 Building SageVDB...${NC}"
+    echo -e "${GREEN}🔨 Running project build steps...${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
     if [ -f "$PROJECT_ROOT/build.sh" ]; then
@@ -194,8 +194,8 @@ echo -e "  ${GREEN}•${NC} pre-push: Prevents duplicate PyPI versions and can a
 echo ""
 echo -e "${BLUE}${BOLD}Useful Commands:${NC}"
 echo -e "  ${CYAN}./build.sh${NC}                    - Quick rebuild"
-echo -e "  ${CYAN}sage-pypi-publisher build${NC}     - Build distribution packages"
-echo -e "  ${CYAN}sage-pypi-publisher publish${NC}   - Build and publish to PyPI"
+echo -e "  ${CYAN}wheelwright build${NC}     - Build distribution packages"
+echo -e "  ${CYAN}wheelwright publish${NC}   - Build and publish to PyPI"
 echo ""
 echo -e "${GREEN}Happy coding! 🚀${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

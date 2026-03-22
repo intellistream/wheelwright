@@ -3,7 +3,7 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "isage-pypi-publisher"
+name = "wheelwright"
 dynamic = ["version"]
 description = "Python bytecode compiler and PyPI publishing toolkit for monorepos"
 readme = "README.md"
@@ -51,7 +51,7 @@ dependencies = [
 full = []
 dev = [
     # dev includes [full] — no need for a separate extras install
-    "isage-pypi-publisher[full]",
+    "wheelwright[full]",
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "ruff>=0.4.0",
@@ -59,13 +59,13 @@ dev = [
 ]
 
 [project.scripts]
-sage-pypi-publisher = "pypi_publisher.cli:main"
+wheelwright = "wheelwright.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/intellistream/pypi-publisher"
-Documentation = "https://github.com/intellistream/pypi-publisher#readme"
-Repository = "https://github.com/intellistream/pypi-publisher"
-Issues = "https://github.com/intellistream/pypi-publisher/issues"
+Homepage = "https://github.com/intellistream/wheelwright"
+Documentation = "https://github.com/intellistream/wheelwright#readme"
+Repository = "https://github.com/intellistream/wheelwright"
+Issues = "https://github.com/intellistream/wheelwright/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -74,7 +74,7 @@ where = ["src"]
 "*" = ["py.typed", "*.pyi"]
 
 [tool.setuptools.dynamic]
-version = {attr = "pypi_publisher._version.__version__"}
+version = {attr = "wheelwright._version.__version__"}
 
 [tool.ruff]
 line-length = 100

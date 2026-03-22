@@ -22,17 +22,17 @@ def test_version_source_contract():
     attr = (
         data.get("tool", {}).get("setuptools", {}).get("dynamic", {}).get("version", {}).get("attr")
     )
-    assert attr == "pypi_publisher._version.__version__"
+    assert attr == "wheelwright._version.__version__"
 
-    version_file = root / "src" / "pypi_publisher" / "_version.py"
-    init_file = root / "src" / "pypi_publisher" / "__init__.py"
+    version_file = root / "src" / "wheelwright" / "_version.py"
+    init_file = root / "src" / "wheelwright" / "__init__.py"
 
     version_text = version_file.read_text(encoding="utf-8")
     assert re.search(r'^__version__\s*=\s*"[^"]+"\s*$', version_text, re.M)
 
     init_text = init_file.read_text(encoding="utf-8")
     patterns = [
-        r"^from\s+pypi_publisher\._version\s+import\s+.*__version__",
+        r"^from\s+wheelwright\._version\s+import\s+.*__version__",
         r"^from\s+\._version\s+import\s+.*__version__",
     ]
     assert any(re.search(pattern, init_text, re.M) for pattern in patterns)

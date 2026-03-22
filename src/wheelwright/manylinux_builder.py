@@ -14,7 +14,7 @@ from pathlib import Path
 
 from rich.console import Console
 
-from pypi_publisher.exceptions import BuildError
+from wheelwright.exceptions import BuildError
 
 console = Console()
 

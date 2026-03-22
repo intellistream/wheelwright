@@ -23,7 +23,7 @@ from typing import Literal
 from rich.console import Console
 from rich.progress import Progress
 
-from pypi_publisher.exceptions import BuildError, CompilationError, UploadError
+from wheelwright.exceptions import BuildError, CompilationError, UploadError
 
 console = Console()
 
@@ -76,7 +76,7 @@ class BytecodeCompiler:
             self.temp_dir.mkdir(parents=True, exist_ok=True)
         else:
             self.temp_dir = Path(
-                tempfile.mkdtemp(prefix=f"pypi_publisher_{self.package_path.name}_")
+                tempfile.mkdtemp(prefix=f"wheelwright_{self.package_path.name}_")
             )
 
         self.compiled_path = self.temp_dir / self.package_path.name

@@ -3,11 +3,11 @@ description: 'Description of the custom chat mode.'
 tools: ['edit', 'runNotebooks', 'search', 'new', 'runCommands', 'runTasks', 'usages', 'vscodeAPI', 'problems', 'changes', 'testFailure', 'openSimpleBrowser', 'fetch', 'githubRepo', 'extensions']
 ---
 
-# SAGE PyPI Publisher Agent
+# Wheelwright Agent
 
 ## What This Agent Does
 
-This specialized agent assists with development and maintenance of the `sage-pypi-publisher` toolkit - a Python bytecode compiler and PyPI publishing tool designed for monorepo projects. It provides expert guidance on:
+This specialized agent assists with development and maintenance of the `wheelwright` toolkit - a Python bytecode compiler and PyPI publishing tool designed for monorepo projects. It provides expert guidance on:
 
 - **Bytecode Compilation**: Converting Python packages to `.pyc` format while preserving critical files
 - **Wheel Building**: Creating distributable wheel packages from compiled code
@@ -36,7 +36,7 @@ This specialized agent assists with development and maintenance of the `sage-pyp
 **DO NOT use this agent for:**
 - General Python questions unrelated to this toolkit
 - Generic PyPI package development (use standard Python agents)
-- Projects outside the sage-pypi-publisher scope
+- Projects outside the wheelwright scope
 - Infrastructure or deployment beyond local builds
 
 ## Ideal Inputs/Outputs
@@ -160,10 +160,10 @@ The agent knows:
 - Python target: 3.10+
 - Linter: ruff with E, F, W, I, N, UP, B, C4 rules
 - Type checker: mypy with strict settings
-- Package name: `sage-pypi-publisher`
-- CLI entry point: `sage-pypi-publisher` command
-- Main module: `pypi_publisher` (not `sage_pypi_publisher`)
+- Package name: `wheelwright`
+- CLI entry point: `wheelwright` command
+- Main module: `wheelwright`
 
 ---
 
-**Use this agent for focused, expert assistance on sage-pypi-publisher development tasks.**
+**Use this agent for focused, expert assistance on wheelwright development tasks.**
